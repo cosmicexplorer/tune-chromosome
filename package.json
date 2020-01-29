@@ -1,0 +1,29 @@
+{
+  "name": "tune-chromosome",
+  "version": "1.0.0",
+  "description": "Mix and match auditory hallucinations!",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cosmicexplorer/tune-chromosome.git"
+  },
+  "keywords": [
+    "music",
+    "audio",
+    "webaudio",
+    "tone.js",
+    "app",
+    "cjsx",
+    "coffeescript",
+    "react.js"
+  ],
+  "author": "Danny McClanahan",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/cosmicexplorer/tune-chromosome/issues"
+  },
+  "homepage": "https://github.com/cosmicexplorer/tune-chromosome#readme"
+}
