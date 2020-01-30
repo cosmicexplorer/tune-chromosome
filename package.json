@@ -2,7 +2,7 @@
   "name": "tune-chromosome",
   "version": "1.0.0",
   "description": "Mix and match auditory hallucinations!",
-  "main": "index.js",
+  "main": "index.mjs",
   "scripts": {
     "test": "npm i . && $(npm bin)/cake check"
   },
@@ -29,7 +29,12 @@
   "devDependencies": {
     "@babel/core": "^7.8.3",
     "@babel/plugin-transform-react-jsx": "^7.8.3",
+    "@babel/preset-env": "^7.8.3",
+    "@babel/preset-react": "^7.8.3",
+    "babel-preset-env": "^1.7.0",
+    "browserify": "^16.5.0",
     "coffeescript": "^2.5.0",
+    "convert-source-map": "^1.7.0",
     "flow": "^0.2.3",
     "flow-bin": "^0.117.0",
     "glob": "^7.1.6"

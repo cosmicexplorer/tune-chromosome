@@ -1,3 +1,4 @@
 *.js
+*.mjs
 *.jsx
 node_modules/
