@@ -4,7 +4,7 @@
   "description": "Mix and match auditory hallucinations!",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm i . && $(npm bin)/cake check"
   },
   "repository": {
     "type": "git",
