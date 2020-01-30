@@ -1,0 +1,64 @@
+#+TITLE: tune-chromosome
+
+* What
+A [[file:LICENSE][GPL]]-licensed frontend for [[https://github.com/Tonejs/Tone.js][Tone.js]] that tries to make iterating on a theme (riffing on a groove) as /natural/ and /instant/ as possible /(TODO: shopping for other good adjectives!!!)/. This frontend is designed as an *adaptive interface* for /extremely low-latency bidirectional communication of rapidly varying musical intent/ using a computer and (almost?) any analog or digital input.
+
+* Why
+*To make music <<at the speed of thought>>!*
+
+Vague hypothesis:
+#+BEGIN_QUOTE
+Most hardware and software for producing music have /extremely/ limited bandwidth with the raw creative brain. This applies to analog instruments as well. It is possible to train very hard to become better at *closing the gap between musical thought and musical action* , _but most interactive interfaces between a human and their audio *increase* this gap immensely_!
+#+END_QUOTE
+
+** Novel Ideas /(inexhaustive list)/
+*** Multiscale Complex Surface Traversal as a Service
+Define a method to traverse the [[instrument space]] which:
+1. Can be [[meaningfully operated]] by a (mostly) arbitrary set of analog or digital inputs /([[tracked peripherals]])/.
+2. Ensures that every motion through instrument space is throttled by some [[dilation factor]].
+   - Each instrument should have *at least one dilation factor* which is *mixed into every motion* through that instrument's space!
+   - Each dilation factor should be exposed through a separate, [[reliably-available]] UI element.
+3. Provides an /extremely/ effective plugin API that makes it /natural/ to *parameterize filters/synths* so that they can be added to ~tune-chromosome~ and be [[meaningfully operated]].
+   - /Note the circular logic. There are many levels to attack this on./
+
+*** Associative (?) Model for Juggling Riffs [[at the Speed of Thought]]
+A graph representation of [[musical operations]] such that:
+1. A <<source>> $s$ can be /invoked/ to produce audio for an arbitrary <<duration>> $t \in \mathbb{R}^{+}$ (nonnegative real number).
+2. A <<riff>> is a tuple $r = (s, t)$, where $s$ is any [[source]] and $t$ is any [[duration]].
+3. Each [[riff]] can
+
+**** musical operations
+Operations that manipulate *one or more* /input riffs/ to produce *one (currently exactly one)* /output riff/. These are partially modelled after /[[https://en.wikipedia.org/wiki/Algebraic_data_type][algebraic data types]]/ in programming languages. Current operations:
+- ~apply(s: Source, f: Filter) -> Source~ :: return a source which produces the result of providing the filter ~f~ with the input ~s~.
+- ~take(s: Source, t: Duration) -> Source~ :: return a source which produces the same result as ~s~, without the first ~t~ seconds (?).
+- ~ ::
+
+* How
+** Develop a Model for Interactive Synthesis
+*** Goals
+1. /Continuously adapt (calibrate?)/ every interface so that *its range of motion spans precisely (?) the user's range of motion*.
+   - Enable the user to effectively *hit every note that the instrument can create*.
+2. Allow the user to modulate the [[dilation factor]] /fluently/ while traversing the instrument space.
+   -
+
+
+* First-Time Build Instructions
+#+BEGIN_SRC bash
+> npm install . && $(npm bin)/cake build:example
+#+END_SRC
+
+* Glossary
+
+- <<tracked peripherals>> :: all digital and analog devices that the user has designated as being active and are providing continuous (?) streams of user input of varying frequencies and event types.
+- <<user space>> :: the cartesian product of the sets of all possible states of all tracked peripherals.
+  - Also known as "the user's range of motion".
+  - Unlike [[instrument space]], this is extremely measurable, and can be known in advance.
+  - /See [[meaningfully operated]]./
+- <<instrument space>> :: the set of all possible outputs of a filter/synth.
+  - This term may be applied at multiple levels of abstraction, and may refer to anything from:
+    - "the instantaneous amperage of the audio signal from the master track", all the way up through:
+    - "a fourier transform of the output",
+    - and much more!
+- <<dilation factor>> :: a positive scalar $d \in \mathbb{R}^{+}$ representing the *magnitude* of the /current motion through the instrument space/.
+- <<meaningfully operated>> :: a state in which moving from one state to any different state on any of the [[tracked peripherals]] induces an "appropriate" (???) motion through [[instrument space]].
+- <<reliably-available>> :: a UI element which is manipulable [[at the speed of thought]] in all possible views of the ~tune-chromosome~ app.

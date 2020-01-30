@@ -25,5 +25,18 @@
   "bugs": {
     "url": "https://github.com/cosmicexplorer/tune-chromosome/issues"
   },
-  "homepage": "https://github.com/cosmicexplorer/tune-chromosome#readme"
+  "homepage": "https://github.com/cosmicexplorer/tune-chromosome#readme",
+  "devDependencies": {
+    "@babel/core": "^7.8.3",
+    "@babel/plugin-transform-react-jsx": "^7.8.3",
+    "coffeescript": "^2.5.0",
+    "glob": "^7.1.6"
+  },
+  "dependencies": {
+    "lodash": "^4.17.15",
+    "tone": "^13.8.25"
+  },
+  "plugins": [
+    "@babel/plugin-transform-react-jsx"
+  ]
 }
