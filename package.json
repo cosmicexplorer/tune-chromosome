@@ -30,10 +30,14 @@
     "@babel/core": "^7.8.3",
     "@babel/plugin-transform-react-jsx": "^7.8.3",
     "coffeescript": "^2.5.0",
+    "flow": "^0.2.3",
+    "flow-bin": "^0.117.0",
     "glob": "^7.1.6"
   },
   "dependencies": {
     "lodash": "^4.17.15",
+    "react": "^16.12.0",
+    "react-dom": "^16.12.0",
     "tone": "^13.8.25"
   },
   "plugins": [
