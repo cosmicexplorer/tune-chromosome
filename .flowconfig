@@ -1,11 +1,15 @@
 [ignore]
+.*node_modules/module-deps/test.*
 
 [include]
+frontend/
 
 [libs]
 
 [lints]
 
 [options]
+munge_underscores=true
+experimental.const_params=true
 
 [strict]

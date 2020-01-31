@@ -3,13 +3,14 @@
 # Declare these implicitly-imported methods from the Cakefile prelude.
 ###::
 declare function invoke(s: string): null;
+declare function option(short: string, long: string, desc: string): null;
 declare function task(name: string, desc: string, cb: (...args: any) => any): any;
 ###
 
 # stdlib requires, with some promising hacks.
 assert = require 'assert'
 fs = require 'fs'
-{stream..., Transform} = require 'stream'
+{Transform} = stream = require 'stream'
 path = require 'path'
 util = require 'util'
 
@@ -25,8 +26,6 @@ spawnPromise = do ->
         throw new Error("failed to exit successfully: code #{code}") if code != 0
         cb null, code
   _promisifyFirstArg spawnCmd
-
-forceRelativePath = (p) -> p.replace /^(?:\.\/)?/, './'
 
 existsAll = do ->
   promiseExists = _promisifyFirstArg fs.exists
@@ -58,9 +57,11 @@ _writeFileReturnNewPath = do ->
 _ = require 'lodash'
 browserify = require 'browserify'
 coffeescript = require 'coffeescript'
-convert = require('convert-source-map')
-
+convert = require 'convert-source-map'
 glob = util.promisify require('glob').glob
+# Suggested CoffeeScript syntax improvement:
+# {glob: => util.promisify} = require 'glob'
+unflowify = require 'unflowify'
 
 _babelTransformSingleFile = do ->
   {transformFileAsync} = require '@babel/core'
@@ -84,11 +85,17 @@ class ParseError extends SyntaxError
       module.
   ###
 
-  constructor: (error, src, file) ->
+  ###::
+    annotated: string
+    line: number
+    column: number
+  ###
+
+  constructor: ({@message, location: {first_line, last_line, first_column, last_column}},
+                src, file) ->
     super()
-    @message = error.message
-    @line = error.location.first_line + 1 # cs linenums are 0-indexed
-    @column = error.location.first_column + 1; # same with columns
+    @line = first_line + 1 # cs linenums are 0-indexed
+    @column = first_column + 1 # same with columns
 
     markerLen = 2
     {location: {first_line, last_line, first_column, last_column}} = error
@@ -115,15 +122,32 @@ getJsFileBasename = (p) ->
 
 
 class Coffeeify extends Transform
+  ###::
+    filename: string
+    savedChunks: Array<Buffer>
+    compileOptions: {
+      ast: boolean,
+      sourceMap: boolean,
+      inlineMap: boolean,
+      filename: string,
+      bare: boolean,
+      header: boolean,
+      inline: boolean,
+      literate: boolean,
+      transpile: {
+        presets: Array<string>,
+      },
+    }
+  ###
 
-  constructor: (@filename, {_flags: {debug: sourceMap = no}, ...rest} = {}) ->
+  constructor: (@filename, {_flags: {debug: sourceMap = no}, ...moreFlags}) ->
     super()
     @savedChunks = []
     @compileOptions = {
       sourceMap
       bare: yes
       header: no
-      ...rest
+      ...moreFlags
     }
 
   _transform: (chunk, enc, cb) ->
@@ -184,6 +208,7 @@ generateBundle = do ->
         presets: ["@babel/env", "@babel/react"]
       ...opts
     }
+    .transform unflowify
     .bundle()
     .pipe fs.createWriteStream outputFile
 
@@ -233,7 +258,7 @@ task 'check:flow', 'run the flow typechecker!', ->
   invoke 'build'
 
   await compileFiles ['Cakefile']
-  assert.ok (_promisifyFirstArg fs.exists)('Cakefile.js')
+  assert.ok await (_promisifyFirstArg fs.exists)('Cakefile.mjs')
 
   spawnPromise ['flow', 'check']
 
