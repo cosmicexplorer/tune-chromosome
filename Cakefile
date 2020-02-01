@@ -60,7 +60,8 @@ coffeescript = require 'coffeescript'
 convert = require 'convert-source-map'
 glob = util.promisify require('glob').glob
 # Suggested CoffeeScript syntax improvement:
-# {glob: => util.promisify} = require 'glob'
+# {glob <= util.promisify} = require 'glob'
+# _var1 = require('glob');
 unflowify = require 'unflowify'
 
 _babelTransformSingleFile = do ->
@@ -187,32 +188,39 @@ class Coffeeify extends Transform
       cb err
 
 
-generateBundle = do ->
-  renameCjsxToCoffee = renameAll (f) -> f.replace /\.cjsx$/, '.coffee'
-  (outputFile, inputFiles) ->
-    [cjsxSrc, coffeeSrc] = _.partition inputFiles, (f) -> (f.match /\.cjsx$/)?
+recognizedCoffeeSourceExtensions = [
+  '.coffee'
+  '.litcoffee'
+]
 
-    newCoffeeSources = await renameCjsxToCoffee cjsxSrc
-    allCoffeeSources = [newCoffeeSources..., coffeeSrc...]
-    assert.equal inputFiles.length, allCoffeeSources.length
 
-    bundleStream = browserify
-      entries: allCoffeeSources
-      extensions: ['.coffee']
-      debug: yes
-    .transform (file, opts) -> new Coffeeify file, {
-      bare: no
-      header: yes
-      transpile:
-        presets: ["@babel/env", "@babel/react"]
-      ...opts
-    }
-    .transform unflowify
-    .bundle()
-    .pipe fs.createWriteStream outputFile
+matchesCoffeeSourceFile = (f) -> (recognizedCoffeeSourceExtensions.find (ext) -> f.endsWith ext)?
 
-    afterStreamFinished bundleStream
-      .then -> outputFile
+
+globCoffeeSources = ->
+  _.flatten ((await glob "**/*#{ext}") for ext in recognizedCoffeeSourceExtensions)
+
+
+generateBundle = (outputFile, inputFiles) ->
+  assert.ok inputFiles.every matchesCoffeeSourceFile
+
+  bundleStream = browserify
+    entries: inputFiles
+    extensions: recognizedCoffeeSourceExtensions
+    debug: yes
+  .transform (file, opts) -> new Coffeeify file, {
+    bare: no
+    header: yes
+    transpile:
+      presets: ["@babel/env", "@babel/react"]
+    ...opts
+  }
+  .transform unflowify
+  .bundle()
+  .pipe fs.createWriteStream outputFile
+
+  afterStreamFinished bundleStream
+    .then -> outputFile
 
 # '--bare --no-header' is an official suggestion for flow type checking: see
 # http://coffeescript.org/v2/#type-annotations!
@@ -225,46 +233,36 @@ compileFiles = do ->
 
 # Build tasks.
 task 'build', 'build everything', ->
-  for subcommand in ['coffee', 'cjsx']
-    invoke "build:#{subcommand}"
+  await invoke 'build:coffee'
 
 task 'build:coffee', 'compile all .coffee files', ->
-  coffeeSources = await glob '**/*.coffee'
+  coffeeSources = await globCoffeeSources()
   return if _.isEmpty coffeeSources
 
-  mjsOutputs = coffeeSources.map (f) -> f.replace /\.coffee$/, '.mjs'
+  mjsOutputs = coffeeSources.map (f) -> f.replace /\.(lit)?coffee$/, '.mjs'
   assert.deepEqual mjsOutputs, await compileFiles coffeeSources
 
-task 'build:cjsx', 'compile all .cjsx files', ->
-  cjsxSources = await glob '**/*.cjsx'
-  return if _.isEmpty cjsxSources
+  jsxOutputs = await (renameAll (f) -> f.replace /\.mjs$/, '.jsx')(mjsOutputs)
+  assert.deepEqual mjsOutputs, await (
+    babelTransformAllFiles (f) -> f.replace /\.jsx$/, '.mjs')(jsxOutputs)
 
-  mjsOutputs = cjsxSources.map (f) -> f.replace /\.cjsx$/, '.mjs'
-  assert.deepEqual mjsOutputs, await compileFiles cjsxSources
-  renameMjsToJsx = renameAll (f) -> f.replace /\.mjs$/, '.jsx'
-  jsxOutputs = await renameMjsToJsx mjsOutputs
-  transformJsxToMjs = babelTransformAllFiles (f) -> f.replace /\.jsx$/, '.mjs'
-  assert.deepEqual mjsOutputs, await transformJsxToMjs jsxOutputs
+  await unlinkAll jsxOutputs
 
 task 'check', 'run all tests and static analysis', ->
-  invoke 'check:flow'
+  await invoke 'check:flow'
 
 task 'check:flow', 'run the flow typechecker!', ->
-  # FIXME: 'cake check:flow' will repeatedly fail to see an existing js file created in the previous
-  # run unless we 'clean' beforehand.
-  invoke 'clean'
-
-  invoke 'build'
+  await invoke 'build'
 
   await compileFiles ['Cakefile']
   assert.ok await (_promisifyFirstArg fs.exists)('Cakefile.mjs')
 
-  spawnPromise ['flow', 'check']
+  await spawnPromise ['flow', 'check']
 
 task 'clean', 'clean up generated output', ->
   looseJsOrJsxFiles = await glob '**/*.{m,}js{,x}',
     ignore: 'node_modules/**'
-  unlinkAll looseJsOrJsxFiles
+  await unlinkAll looseJsOrJsxFiles
 
 task 'bundle', 'create a single merged javascript bundle', ({output = 'bundle.js'}) ->
   await unlinkIgnoringError output
@@ -272,7 +270,7 @@ task 'bundle', 'create a single merged javascript bundle', ({output = 'bundle.js
   allCoffeeSources = await glob '**/*.{cjsx,coffee}',
     ignore: 'node_modules/**'
 
-  generateBundle output, allCoffeeSources
+  await generateBundle output, allCoffeeSources
 
 task 'setup-git-hooks', 'add a pre-commit hook to the local repo', ->
   gitHooksDir = '.git/hooks'
