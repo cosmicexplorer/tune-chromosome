@@ -61,7 +61,19 @@ convert = require 'convert-source-map'
 glob = util.promisify require('glob').glob
 # Suggested CoffeeScript syntax improvement:
 # {glob <= util.promisify} = require 'glob'
+#
+# aka:
+# {glob} = require 'glob'; glob = util.promisify glob
+#
+# aka:
+# 'a <= b'
+# 'a = b(a)'
+#
+# in js:
 # _var1 = require('glob');
+# _var2 = _var1.glob;
+# _var3 = util.promisify(_var2);
+# glob = _var3
 unflowify = require 'unflowify'
 
 _babelTransformSingleFile = do ->
