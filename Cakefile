@@ -9,7 +9,7 @@ declare function task(name: string, desc: string, cb: (...args: any) => any): an
 
 # stdlib requires, with some promising hacks.
 assert = require 'assert'
-fs = require 'fs'
+{promises: fsPromises} = fs = require 'fs'
 {Transform} = stream = require 'stream'
 path = require 'path'
 util = require 'util'
@@ -98,7 +98,6 @@ class ParseError extends SyntaxError
     @column = first_column + 1 # same with columns
 
     markerLen = 2
-    {location: {first_line, last_line, first_column, last_column}} = error
     if first_line == last_line
       markerLen += last_column - first_column
 
@@ -274,3 +273,15 @@ task 'bundle', 'create a single merged javascript bundle', ({output = 'bundle.js
     ignore: 'node_modules/**'
 
   generateBundle output, allCoffeeSources
+
+task 'setup-git-hooks', 'add a pre-commit hook to the local repo', ->
+  gitHooksDir = '.git/hooks'
+  await fsPromises.mkdir gitHooksDir, recursive: yes
+  preCommitHook = "#{gitHooksDir}/pre-commit"
+  await fsPromises.writeFile preCommitHook, """
+    #!/usr/bin/env bash
+
+    cake check
+
+    """, mode: 0o777
+  console.info "pre-commit hook linked at #{preCommitHook}!"

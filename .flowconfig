@@ -1,5 +1,5 @@
 [ignore]
-.*node_modules/module-deps/test.*
+.*node_modules/.*/test.*
 
 [include]
 frontend/
