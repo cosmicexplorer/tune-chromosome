@@ -1,6 +1,22 @@
 # @flow
 
 assert = require 'assert'
+fs = require 'fs'
+
+# FIXME: Upstream this into lodash!!!
+splitArrayAt = ###::<T>###(arr ###: Array<T>###, i ###: number###) ###: [Array<T>, Array<T>]### ->
+  assert.ok i < arr.length
+  left = arr[..i]
+  right = arr[i..]
+  [left, right]
+
+###
+internalState|externalState
+:-----------:|:-----------:
+v!             u! (analog!!!)
+s!             m! (analog, or digital-analog-converter?)
+f!             c! ({1,0} x 12???)
+###
 
 class StateSet ###::<T>###
   ###::
@@ -14,14 +30,13 @@ class StateSet ###::<T>###
                                extracted from state set
                                with only #{@states.length} states: #{JSON.stringify @}"
 
-    extracted = @states[..numDimensions]
-    remaining = @states[numDimensions..]
-    # TODO: figure out some way of making using of the prototype chain here???
+    [left, right] = splitArrayAt @states, numDimensions
+    # TODO: figure out some way of making using of the prototype chain here??? flow gets mad at
+    # naive Object.create() invocations >=[
     [
-      new StateSet states: extracted
-      new StateSet states: remaining
+      new StateSet states: left
+      new StateSet states: right
     ]
-
 
 class DiscreteState
   ###::
@@ -30,23 +45,9 @@ class DiscreteState
   constructor: (symbolName ###: string###) ->
     @name = Symbol symbolName
 
-
 class ActiveViewState extends DiscreteState
 class ActiveFilterState extends DiscreteState
-
-
 class ActiveSourceState extends DiscreteState
-
-
-instantaneousStateSchema = (
-    appStates ###: StateSet<ActiveViewState>###,
-    sourcesHandle ###: () => StateSet<ActiveSourceState>###,
-    filters ###: StateSet<ActiveFilterState>###
-    ) ->
-  view: appStates
-  source: sourceGraph
-  filter: filters
-
 
 class DigitalInputState extends DiscreteState
 
@@ -58,11 +59,24 @@ class ContinuousState
 
   constructor: (@minimum, @maximum) ->
 
-
 class AnalogInputState extends ContinuousState
 
+class DigitalToAnalogSpreader extends ContinuousState
+  ###::
+    digital: StateSet<DigitalInputState>
+  ###
 
-instantaneousInputSchema = (digital ###: StateSet<DigitalInputState>###, analog ###: StateSet<AnalogInputState>###) ->
-  continuous: analog
-  magnitude: null
-  control: digital
+  constructor: (@digital, minimum, maximum) ->
+    super minimum, maximum
+
+class InstantaneousAppState
+  ###::
+    viewState: StateSet<ActiveViewState>
+    sourceState: StateSet<ActiveSourceState>
+    filterState: StateSet<ActiveFilterState>
+    fluidInputStream: StateSet<AnalogInputState>
+    magnitudeInputStream: StateSet<AnalogInputState>
+    controlInputStream: StateSet<DigitalInputState>
+  ###
+  constructor: ({@viewState, @sourceState, @filterState,
+                 @fluidInputStream, @magnitudeInputStream, @controlInputStream}) ->

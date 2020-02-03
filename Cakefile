@@ -9,10 +9,14 @@ declare function task(name: string, desc: string, cb: (...args: any) => any): an
 
 # stdlib requires, with some promising hacks.
 assert = require 'assert'
-{promises: fsPromises} = fs = require 'fs'
+fs = require 'fs'
 {Transform} = stream = require 'stream'
 path = require 'path'
 util = require 'util'
+
+COFFEESCRIPT_CHECKOUT = '/Users/dmcclanahan/tools/coffeescript'
+
+coffeeCommandName = "#{COFFEESCRIPT_CHECKOUT}/invoke-coffeescript.zsh"
 
 _promisifyFirstArg = (f) ->
   promiseF = util.promisify f
@@ -208,10 +212,8 @@ recognizedCoffeeSourceExtensions = [
 
 matchesCoffeeSourceFile = (f) -> (recognizedCoffeeSourceExtensions.find (ext) -> f.endsWith ext)?
 
-
 globCoffeeSources = ->
-  _.flatten ((await glob "**/*#{ext}") for ext in recognizedCoffeeSourceExtensions)
-
+  _.flatten await Promise.all (glob "**/*#{ext}" for ext in recognizedCoffeeSourceExtensions)
 
 generateBundle = (outputFile, inputFiles) ->
   assert.ok inputFiles.every matchesCoffeeSourceFile
@@ -240,25 +242,45 @@ compileFiles = do ->
   renameJsOutput = renameAll (f) -> f.replace /\.js$/, '.mjs'
   (paths) ->
     jsOutputPaths = paths.map getJsFileBasename
-    spawnPromise ['coffee', '-c', '--bare', '--no-header', ...paths]
+    spawnPromise [coffeeCommandName, '-c', '--bare', '--no-header', ...paths]
       .then -> renameJsOutput jsOutputPaths
 
 # Build tasks.
 task 'build', 'build everything', ->
   await invoke 'build:coffee'
 
+selectInvalidatedCompiles = (filenamePairs) -> await for [inF, outF] in filenamePairs
+  {mtimeMs: inputFileModificationTime} = await fs.promises.stat inF
+
+  missingOutputFile = no
+  {mtimeMs: outputFileModificationTime} = await fs.promises.stat(outF).catch (err) ->
+    missingOutputFile = yes
+    err
+
+  # If the output file doesn't exist or was last updated before the source file, it's invalid!
+  if missingOutputFile or (inputFileModificationTime < outputFileModificationTime)
+    [inF, outF]
+
 task 'build:coffee', 'compile all .coffee files', ->
   coffeeSources = await globCoffeeSources()
-  return if _.isEmpty coffeeSources
 
   mjsOutputs = coffeeSources.map (f) -> f.replace /\.(lit)?coffee$/, '.mjs'
-  assert.deepEqual mjsOutputs, await compileFiles coffeeSources
 
-  jsxOutputs = await (renameAll (f) -> f.replace /\.mjs$/, '.jsx')(mjsOutputs)
-  assert.deepEqual mjsOutputs, await (
-    babelTransformAllFiles (f) -> f.replace /\.jsx$/, '.mjs')(jsxOutputs)
+  [invalidatedCoffeeSources = [], invalidatedMjsOutputs = []] =
+    _.unzip await selectInvalidatedCompiles (_.zip coffeeSources, mjsOutputs)
 
-  await unlinkAll jsxOutputs
+  return if _.isEmpty invalidatedCoffeeSources
+
+  assert.deepEqual invalidatedMjsOutputs, await compileFiles invalidatedCoffeeSources
+
+  # Not currently using jsx and this currently will create some issues when using flow types!!!
+  # jsxOutputs = await (renameAll (f) -> f.replace /\.mjs$/, '.jsx')(mjsOutputs)
+  # assert.deepEqual mjsOutputs, await (
+  #   babelTransformAllFiles (f) -> f.replace /\.jsx$/, '.mjs'
+  # )(jsxOutputs)
+
+  # # We don't want flow to have to see these!
+  # await unlinkAll jsxOutputs
 
 task 'check', 'run all tests and static analysis', ->
   await invoke 'check:flow'
@@ -286,9 +308,9 @@ task 'bundle', 'create a single merged javascript bundle', ({output = 'bundle.js
 
 task 'setup-git-hooks', 'add a pre-commit hook to the local repo', ->
   gitHooksDir = '.git/hooks'
-  await fsPromises.mkdir gitHooksDir, recursive: yes
+  await fs.promises.mkdir gitHooksDir, recursive: yes
   preCommitHook = "#{gitHooksDir}/pre-commit"
-  await fsPromises.writeFile preCommitHook, """
+  await fs.promises.writeFile preCommitHook, """
     #!/usr/bin/env bash
 
     cake check
