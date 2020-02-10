@@ -1,10 +1,10 @@
 # @flow
 
 assert = require 'assert'
-fs = require 'fs'
 
 # FIXME: Upstream this into lodash!!!
 splitArrayAt = ###::<T>###(arr ###: Array<T>###, i ###: number###) ###: [Array<T>, Array<T>]### ->
+  assert.ok i > 0
   assert.ok i < arr.length
   left = arr[..i]
   right = arr[i..]
@@ -13,9 +13,9 @@ splitArrayAt = ###::<T>###(arr ###: Array<T>###, i ###: number###) ###: [Array<T
 ###
 internalState|externalState
 :-----------:|:-----------:
-v!             u! (analog!!!)
-s!             m! (analog, or digital-analog-converter?)
-f!             c! ({1,0} x 12???)
+v!            u! (analog!!!)
+s!            m! (analog, or digital-analog-converter?)
+f!            c! ({1,0} x 12???)
 ###
 
 class StateSet ###::<T>###
@@ -25,6 +25,7 @@ class StateSet ###::<T>###
   constructor: (@states) ->
 
   extractDimensions: (numDimensions ###: number###) ###: [StateSet<T>, StateSet<T>]### ->
+    assert.ok numDimensions > 0
     remaining = @states.length - numDimensions
     assert.ok remaining >= 0, "too many dimensions #{numDimensions}
                                extracted from state set
@@ -56,7 +57,6 @@ class ContinuousState
     minimum: number
     maximum: number
   ###
-
   constructor: (@minimum, @maximum) ->
 
 class AnalogInputState extends ContinuousState
@@ -65,7 +65,6 @@ class DigitalToAnalogSpreader extends ContinuousState
   ###::
     digital: StateSet<DigitalInputState>
   ###
-
   constructor: (@digital, minimum, maximum) ->
     super minimum, maximum
 
