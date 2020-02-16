@@ -39,7 +39,6 @@ Operations that manipulate *one or more* /input riffs/ to produce *one (currentl
 1. /Continuously adapt (calibrate?)/ every interface so that *its range of motion spans precisely (?) the user's range of motion*.
    - Enable the user to effectively *hit every note that the instrument can create*.
 2. Allow the user to modulate the [[dilation factor]] /fluently/ while traversing the instrument space.
-   -
 
 
 * First-Time Build Instructions
