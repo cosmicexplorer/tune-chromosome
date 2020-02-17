@@ -157,17 +157,13 @@ A `FilterNode` is a wrapper for a node in a vast searchable graph of all `Filter
 
     _filterNodeSeparator = '/'
 
-TODO: This is a hacky way to get the original string passed in as input to the `Symbol` constructor. **We use this to construct searchable names of filters, using `Symbol`s to ensure uniqueness when used as an object key.**
-
-    _getSymbolName = (s###: symbol###)###: string### -> s.toString().replace /^Symbol\(|\)$/g, ''
-
     ###::
       interface FilterNodeAgglomeration {}
 
       type _pipeOptions = {
         source: FilterNode,
         output: FilterNode,
-        name?: ?symbol,
+        name?: ?string,
       }
 
       type _pipedSourceOutput = {
@@ -180,11 +176,12 @@ TODO: This is a hacky way to get the original string passed in as input to the `
 - `source` and `output` allow traversing sources step by step by walking "between" them.
 - `timestamp` enables time travel view (chronological search) through filters!
 
+The `FilterNode` class follows:
 
     class FilterNode
       ###::
         filter: Filter
-        name: symbol
+        name: string
         source: ?FilterNode
         output: ?FilterNode
         timestamp: Date
@@ -204,8 +201,6 @@ We cast through any to satisfy Flow here. See https://flow.org/en/docs/types/cas
         source2 = (source###: any###)
         output2 = (output###: any###)
         {source: source2, output: output2}
-
-      symbolName: -> _getSymbolName @name
 
       pipe: (options###: _pipeOptions###) ###: FilterNode### ->
         {source, output, name = null} = options
@@ -263,7 +258,7 @@ This class points somewhere into some nested FilterNode and into a setting on it
 
     Silence = new FilterNode
       filter: new Filter new InputMapping {}
-      name: Symbol ''
+      name: ''
       source: null
       output: null
       timestamp: new Date
@@ -299,7 +294,7 @@ This class points somewhere into some nested FilterNode and into a setting on it
 
     class DiscreteState
       ###::
-        name: symbol
+        name: string
       ###
       constructor: (@name) ->
 
@@ -387,13 +382,13 @@ The "append" operation will trigger a move to the `filter-select` view. Upon ret
 Immediately after selecting a filter, we expect the node we receive to have been sanitized of input and output. The input and output is controlled by the *user*, *elsewhere*!
 
 
-        newName = "#{activeFilterNode.symbolName()}#{_filterNodeSeparator}#{selectedFilterNode.symbolName()}"
+        newName = "#{activeFilterNode.name}#{_filterNodeSeparator}#{selectedFilterNode.name}"
 
         {output} = activeFilterNode.assertPipedSourceOutput()
         combinedNode = selectedFilterNode.pipe
           source: activeFilterNode
           output: output
-          name: Symbol newName
+          name: newName
 
 
 It's still **absolutely bonkers** to me that we can just *mutate* `state.activeFilterNode` here, then expect that because `state.requestResource()` will internally call `Object.create @`, we can just let it go forward on its merry way (not modifying any other states, creating a little sandbox of sorts!!)! We've invented react.js again!!!
