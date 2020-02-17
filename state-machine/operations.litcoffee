@@ -371,6 +371,8 @@ The "append" operation will trigger a move to the `filter-select` view. Upon ret
   - Map (in an extremely stable priority order) any free variables to inputs of the new filter!
     - **TODO:** this sounds like it's still decomposable into separate operations for now, but it sure *sounds* a lot like the "Affix/Remap" operation!'
 
+The `Append` class follows:
+
 
     class Append ###:: implements Operation###
       invoke: (state) ->
