@@ -33,9 +33,9 @@ We would prefer to uses an `interface Resource`, but that causess Flow to blow u
 
     class FilterParameterRequest extends Resource
       ###::
-        selectedInput: InputSet
+        selectedInputs: InputSet
       ###
-      constructor: (@selectedInput) ->
+      constructor: (@selectedInputs) ->
         super()
 
 
@@ -44,16 +44,6 @@ Separate from [`InputMapping`](#inputmapping) -- this describes the *View's* int
 
 
     class InputControlsSpecification
-
-
-# StateChangeRequest
-
-    class StateChangeRequest
-      ###::
-        request: Resource
-        state: AppState
-      ###
-      constructor: (@request, @state) ->
 
 # StateChangeResult
 
@@ -71,9 +61,9 @@ Separate from [`InputMapping`](#inputmapping) -- this describes the *View's* int
 # Views
 
     ###::
-      interface View< Product > {
-        provides(): Class< Resource >;
-        switchTo(request: StateChangeRequest): Promise< StateChangeResult< Product > >;
+      interface View< Res: Resource, Product > {
+        provides(): Class< Res >;
+        switchTo(request: Res): Promise< Product >;
       }
     ###
 
@@ -82,43 +72,61 @@ Separate from [`InputMapping`](#inputmapping) -- this describes the *View's* int
 Pass in the state without modification, *ignore* the request, and return undefined.
 
 
-    class Main ###:: implements View< null >###
+    class Main ###:: implements View< NullResource, null >###
       provides: -> NullResource
-      switchTo: ({state}) ->
-        state.activeView = @
-        await return new StateChangeResult null, state
+      switchTo: ->
+        await return null
 
 
 ## FilterSelect
 We similarly ignore the `request` here, as `FilterRequest` has no useful information in it at this time.
 
 
-    class FilterSelect ###:: implements View< FilterNode >###
+    class FilterSelect ###:: implements View< FilterRequest, FilterNode >###
       provides: -> FilterRequest
-      switchTo: ({state}) ->
-
-        state.activeView = @
-
+      switchTo: ->
         # TODO: return something other than the Silence filter!!!
-        await return new StateChangeResult Silence, state
+        await return Silence
 
 
 ## SelectInput
 
 
-    class SelectInput ###:: implements View< InputSet >###
+    class DigitalKey extends InputAxis
+
+
+    class SelectInput ###:: implements View< InputSetRequest, InputSet >###
       provides: -> InputSetRequest
-      switchTo: ({state}) ->
-        await throw new Error("not implemented yet! state was: #{JSON.stringify state}")
+      switchTo: ->
+        await return new InputSet [
+          new InputAxisNode
+            name: 'digital-key'
+            axis: new DigitalKey
+            filterParameter: null
+        ]
 
 
 ## SelectFilterParameter
 
 
-    class SelectFilterParameter ###:: implements View< RemapResult >###
+    class SelectFilterParameter ###:: implements View< FilterParameterRequest, RemapResult >###
       provides: -> FilterParameterRequest
-      switchTo: ({state, request: selectedInput}) ->
-        await throw new Error("not implemented yet! state was: #{JSON.stringify state}")
+      switchTo: ({selectedInputs}) ->
+
+        assert.equal 1, selectedInputs.axes.length
+        [axisNode] = selectedInputs.axes
+
+        assert.ok not axisNode.filterParameter?
+
+        mappedAxisNode = new InputAxisNode
+          name: axisNode.name
+          axis: axisNode.axis
+          # TODO: actually add logic to choose a specific FilterParameter here!!
+          filterParameter: new FilterParameter
+
+        newMapping = new InputMapping {[mappedAxisNode.name]: mappedAxisNode}
+
+        await return new RemapResult newMapping
 
     class RemapResult
       ###::
@@ -183,6 +191,7 @@ TODO: This is a hacky way to get the original string passed in as input to the `
       ###
       constructor: ({@filter, @name, @source, @output, @timestamp}) ->
 
+
 Retrieve the `source` and `output` nodes after asserting that they exist (i.e. that this FilterNode is "active" and has a specified input and output stream).
 
       assertPipedSourceOutput: ###: _pipedSourceOutput### ->
@@ -219,14 +228,19 @@ Immediately after selecting a filter, we expect the node we receive to have been
 
 # Input{Axis,Set,Mapping}
 
-    ###::
-      interface InputAxis {
-      }
-    ###
+    class InputAxis
+
+    class InputAxisNode
+      ###::
+        name: string
+        axis: InputAxis
+        filterParameter: ?FilterParameter
+      ###
+      constructor: ({@name, @axis, @filterParameter = null}) ->
 
     class InputSet
       ###::
-        axes: Array< InputAxis >
+        axes: Array< InputAxisNode >
       ###
       constructor: (@axes) ->
 
@@ -235,9 +249,15 @@ Immediately after selecting a filter, we expect the node we receive to have been
       @Empty: => new @ []
 
 
+## FilterParameter
+This class points somewhere into some nested FilterNode and into a setting on its contained Filter. Note that a Filter will have its own InputMapping as well. **RECURSION!**
+
+
+    class FilterParameter
+
     class InputMapping
       ###::
-        mapping: {[InputAxis]: any}
+        mapping: {[string]: InputAxisNode}
       ###
       constructor: (@mapping) ->
 
@@ -327,9 +347,13 @@ Immediately after selecting a filter, we expect the node we receive to have been
       requestResource: ###::< Res: Resource, Prod >### (resource###: Res###) ###: Promise< StateChangeResult< Prod > >### ->
         nextView = @resourceMapping[Object.getPrototypeOf resource]
 
+        result = await nextView.switchTo resource
+
         prototypeChainState = Object.create @
 
-        return await nextView.switchTo new StateChangeRequest resource, prototypeChainState
+        prototypeChainState.activeView = nextView
+
+        return new StateChangeResult result, prototypeChainState
 
 
 
