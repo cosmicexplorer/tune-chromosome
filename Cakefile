@@ -286,6 +286,8 @@ task 'check', 'run all tests and static analysis', ->
   await invoke 'check:flow'
 
 task 'check:flow', 'run the flow typechecker!', ->
+  # FIXME: Flow will error out if we don't 'clean' for some reason >=[
+  await invoke 'clean'
   await invoke 'build'
 
   await compileFiles ['Cakefile']
