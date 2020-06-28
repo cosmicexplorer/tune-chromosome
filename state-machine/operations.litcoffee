@@ -20,7 +20,7 @@ TODO: Maybe upstream these into lodash!!!??
 
 # Resource
 
-We would prefer to uses an `interface Resource`, but that causess Flow to blow up when trying to use the interface `Resource` as a trait bound eleswhere.
+We would prefer to uses an `interface Resource`, but that causes Flow to blow up when trying to use the interface `Resource` as a trait bound elsewhere.
 
     class Resource
 
@@ -69,22 +69,25 @@ Separate from [`InputMapping`](#inputmapping) -- this describes the *View's* int
 
 
 ## Main
-Pass in the state without modification, *ignore* the request, and return undefined.
-
 
     class Main ###:: implements View< NullResource, null >###
       provides: -> NullResource
+
+Pass in the state without modification, *ignore* the request, and return undefined.
+
       switchTo: ->
         await return null
 
 
 ## FilterSelect
-We similarly ignore the `request` here, as `FilterRequest` has no useful information in it at this time.
 
 
     class FilterSelect ###:: implements View< FilterRequest, FilterNode >###
       provides: -> FilterRequest
-      switchTo: ->
+
+We similarly ignore the `request` here, as `FilterRequest` has no useful information in it at this time.
+
+      switchTo: (_request) ->
         # TODO: return something other than the Silence filter!!!
         await return Silence
 
@@ -173,6 +176,7 @@ A `FilterNode` is a wrapper for a node in a vast searchable graph of all `Filter
     ###
 
 - `name` contains a reference to the entire prototype chain of filters for fuzzy matching at the speed of thought (like emacs buffer searching by name with helm!!!).
+    - `name` can also be set afterwards to "pin" or "save" specific filters with short abbreviations.
 - `source` and `output` allow traversing sources step by step by walking "between" them.
 - `timestamp` enables time travel view (chronological search) through filters!
 
@@ -404,7 +408,6 @@ It's still **absolutely bonkers** to me that we can just *mutate* `state.activeF
 
 ## Select
 
-
     class Select ###:: implements Operation###
       invoke: (state) ->
         {activeFilterNode} = state
@@ -423,6 +426,24 @@ Here again, we can modify the state, then ask it to send us home.
 
         {state} = await state.requestResource new NullResource
         return state
+
+
+## Undo
+
+Extremely similar to `Select`, but simply follows the `.source` field from the active `FilterNode`. Note that `source` and `output` form a doubly-linked list of `FilterNode`s.
+
+    class Undo ###:: implements Operation###
+      invoke: (state) ->
+        {activeFilterNode: {source}} = state
+
+        throw new Error("TODO: undo without a previous filter") unless source?
+
+        state.activeFilterNode = source
+
+        {state} = await state.requestResource new NullResource
+        return state
+
+TODO: implement redo!
 
 
 ## AffixRemap
