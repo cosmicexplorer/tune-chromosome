@@ -270,66 +270,6 @@ This class points somewhere into some nested FilterNode and into a setting on it
 
 **Filters are a "sound state", and FilterNodes are an index into a field (TODO: a math field????) to traverse sound states!!!!**
 
-
-# StateSet
-
-
-    class StateSet ###::< T >###
-      ###::
-        states: Array< T >
-      ###
-      constructor: (@states) ->
-
-      extractDimensions: (numDimensions ###: number###) ###: [StateSet< T >, StateSet< T >]### ->
-        assert.ok numDimensions > 0
-        remaining = @states.length - numDimensions
-        assert.ok remaining >= 0, "too many dimensions #{numDimensions}
-                                   extracted from state set
-                                   with only #{@states.length} states: #{JSON.stringify @}"
-
-        [left, right] = splitArrayAt @states, numDimensions
-        # TODO: figure out some way of making using of the prototype chain here??? flow gets mad at
-        # naive Object.create() invocations >=[
-        [
-          new StateSet states: left
-          new StateSet states: right
-        ]
-
-
-    class DiscreteState
-      ###::
-        name: string
-      ###
-      constructor: (@name) ->
-
-
-    class ActiveViewState extends DiscreteState
-
-    class ActiveFilterState extends DiscreteState
-
-    class DigitalInputState extends DiscreteState
-
-
-    class ContinuousState
-      ###::
-        minimum: number
-        maximum: number
-      ###
-      constructor: (@minimum, @maximum) ->
-
-
-    class AnalogInputState extends ContinuousState
-
-
-    class DigitalToAnalogSpreader extends ContinuousState
-      ###::
-        digital: StateSet< DigitalInputState >
-      ###
-      constructor: (@digital, minimum, maximum) ->
-        super minimum, maximum
-
-
-
 # AppState
 **`AppState` represents the state of the entire application, such that it can be precisely reconstructed later, upon app startup, to drop the user into the exact same visuals, input mapping, and view.** This is in contrast to [`Filter`s](#filters), which represent just the state of a particular sound being iterated on at some point (this is intentionally decoupled from app state).
 
@@ -359,7 +299,6 @@ This class points somewhere into some nested FilterNode and into a setting on it
 # Operations
 
 "Operations" are defined to be the impetus by which the app moves through its [views](#views).
-
 
     ###::
       interface Operation {
