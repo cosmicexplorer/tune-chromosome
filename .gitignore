@@ -2,3 +2,5 @@
 *.mjs
 *.jsx
 node_modules/
+*.css
+*.map

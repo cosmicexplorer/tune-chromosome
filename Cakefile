@@ -18,6 +18,8 @@ COFFEESCRIPT_CHECKOUT = '/Users/dmcclanahan/tools/coffeescript'
 
 coffeeCommandName = "#{COFFEESCRIPT_CHECKOUT}/invoke-coffeescript.zsh"
 
+sassCompilerPath = "node_modules/.bin/sass"
+
 _promisifyFirstArg = (f) ->
   promiseF = util.promisify f
   (arg) -> promiseF arg
@@ -47,6 +49,7 @@ renameAll = (replaceFn) -> (paths) ->
 
 unlinkIgnoringError = _promisifyFirstArg (path, cb) ->
   fs.unlink path, -> cb()
+
 unlinkAll = do ->
   promiseUnlink = _promisifyFirstArg fs.unlink
   (paths) -> Promise.all paths.map promiseUnlink
@@ -215,6 +218,8 @@ matchesCoffeeSourceFile = (f) -> (recognizedCoffeeSourceExtensions.find (ext) ->
 globCoffeeSources = ->
   _.flatten await Promise.all (glob "**/*#{ext}" for ext in recognizedCoffeeSourceExtensions)
 
+globSassSources = -> await glob "**/*.sass"
+
 generateBundle = (outputFile, inputFiles) ->
   assert.ok inputFiles.every matchesCoffeeSourceFile
 
@@ -245,9 +250,15 @@ compileFiles = do ->
     spawnPromise [coffeeCommandName, '-c', '--bare', '--no-header', ...paths]
       .then -> renameJsOutput jsOutputPaths
 
+compileSass = (paths) ->
+  cssOutputPaths = paths.map (f) -> f.replace /\.sass$/, '.css'
+  joinedCssInOutArgs = (_.zip paths, cssOutputPaths).map ([inF, outF]) -> "#{inF}:#{outF}"
+  spawnPromise [sassCompilerPath, ...joinedCssInOutArgs]
+    .then -> cssOutputPaths
+
 # Build tasks.
 task 'build', 'build everything', ->
-  await invoke 'build:coffee'
+  await Promise.all [(invoke 'build:coffee'), (invoke 'build:sass')]
 
 selectInvalidatedCompiles = (filenamePairs) -> await for [inF, outF] in filenamePairs
   {mtimeMs: inputFileModificationTime} = await fs.promises.stat inF
@@ -281,6 +292,18 @@ task 'build:coffee', 'compile all .coffee files', ->
 
   # # We don't want flow to have to see these!
   # await unlinkAll jsxOutputs
+
+task 'build:sass', 'compile all .sass files', ->
+  sassSources = await globSassSources()
+
+  cssOutputs = sassSources.map (f) -> f.replace /\.sass$/, '.css'
+
+  [invalidatedSassSources = [], invalidatedCssOutputs = []] =
+    _.unzip await selectInvalidatedCompiles (_.zip sassSources, cssOutputs)
+
+  return if _.isEmpty invalidatedSassSources
+
+  assert.deepEqual invalidatedCssOutputs, await compileSass invalidatedSassSources
 
 task 'check', 'run all tests and static analysis', ->
   await invoke 'check:flow'

@@ -38,6 +38,7 @@
     "flow": "^0.2.3",
     "flow-bin": "^0.117.0",
     "glob": "^7.1.6",
+    "sass": "^1.26.9",
     "unflowify": "^1.0.1"
   },
   "dependencies": {
