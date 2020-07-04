@@ -39,4 +39,5 @@ class TypedMap ###::< K: TypedKey, V >###
 
   entries: -> @tupleMap.values()
 
+
 module.exports = {TypedMap}

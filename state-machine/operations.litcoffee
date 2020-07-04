@@ -390,6 +390,7 @@ TODO: implement redo!
 
     class AffixRemap ###:: implements Operation###
       invoke: (state) ->
+        # TODO: reverse this logic -- we will want to select the FilterParameter first, *then* the input control to map it to!!
         {product: selectedInput, state} = await state.requestResource ###::< _, InputSet >### (new InputSetRequest)
 
         {product: {inputMapping: remapResult}, state} = (

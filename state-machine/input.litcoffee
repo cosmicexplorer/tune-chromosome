@@ -2,8 +2,6 @@
 
     assert = require 'assert'
 
-    {TypedMap} = require '../util/collections'
-
 # StateSource
 
     ###::
@@ -23,13 +21,14 @@
 
       extractNormalizedFloat: -> @inner
 
-      @Zero: -> @ 0
-      @One: -> @ 1
+      @Zero: -> new @ 0
+      @One: -> new @ 1
 
     class FloatRange
       ###::
         minimum: number
         maximum: number
+        diff: number
       ###
       constructor: (@minimum, @maximum) ->
         assert.ok @maximum > @minimum
@@ -39,7 +38,7 @@
         assert.ok input >= @minimum
         assert.ok input <= @maximum
         inner = (input - @minimum) / @diff
-        NormalizedFloat inner
+        new NormalizedFloat inner
 
     class ContinuousInput ###::implements StateSource< number, NormalizedFloat >###
       ###::
@@ -50,7 +49,7 @@
 
       sample: ()###: NormalizedFloat### -> @value
 
-      update: (input###: number###) ->
+      update: (newInput###: number###) ->
         @value = @range.normalize newInput
         null
 
@@ -61,16 +60,23 @@ Then we define a `DigitalInput`.
         value: Symbol
       ###
       constructor: (@value) ->
+        # $FlowFixMe
         assert.ok (@value is DigitalValue._Down) or (@value is DigitalValue._Up)
 
       setValueFrom: (other###: DigitalValue###) ->
         @value = other.value
         null
 
-      @_Down = new Symbol 'keycode-down'
-      @_Up = new Symbol 'keycode-up'
-      @Down: -> @ @_Down
-      @Up: -> @ @_Up
+      # $FlowFixMe
+      @_Down = Symbol 'keycode-down'
+      # $FlowFixMe
+      @_Up = Symbol 'keycode-up'
+      @Down: ->
+        # $FlowFixMe
+        new @ DigitalValue._Down
+      @Up: ->
+        # $FlowFixMe
+        new @ DigitalValue._Up
 
     class DigitalInput ###::implements StateSource< DigitalValue, DigitalValue >###
       ###::
@@ -90,83 +96,10 @@ Then we define a `DigitalInput`.
 
     # TODO: implement this! Note that it will have to assert or ensure that only one of the digital
     # inputs will ever be on at a time!
-    class DigitalToAnalogSpreader ###::implements StateSource< NormalizedFloat >###
-      ###::
-        range: FloatRange
-        orderedInputs: Array< DigitalInput >
-      ###
-      constructor: (@range, @orderedInputs) ->
-        assert.ok @orderedInputs.length > 0
-
-# StateSet
-
-    ###::
-      interface StateSet<K, V> {
-        sampleKey(key: K): V;
-        updateKey(key: K, value: V): null;
-      }
-    ###
-
-    # class ContinuousInputSet ###::implements StateSet<  >###
-
-    class KeyCode ###:: implements TypedKey###
-      ###::
-        value: number
-      ###
-      constructor: (@value) ->
-        assert.ok Number.isInteger @value
-
-      extractValue: -> @value
-
-      computeHash: -> @value
-
-Note that `KeyCode`s may have negative integer `.value`s *(for now)*.
-
-    class DigitalInputSet ###::implements StateSet< KeyCode, DigitalValue >###
-      ###::
-        inputs: TypedMap< KeyCode, DigitalValue >
-      ###
-      constructor: (inputs###: Array< [KeyCode, DigitalValue] >###) ->
-        @inputs = new TypedMap
-
-        for [keyCode, digitalValue] in inputs
-          duplicatePrevious = @inputs.get keyCode
-          if duplicatePrevious?
-            throw new Error("duplicate inputs registered for #{keyCode}: #{duplicatePrevious} and #{digitalValue}")
-          @inputs.set keyCode, digitalValue
-
-      sampleKey: (key###: KeyCode###)###: DigitalValue### -> @inputs.get key
-
-      updateKey: (key###: KeyCode###, value###: DigitalValue###) ->
-        prevDigitalValue = @inputs.get key
-        prevDigitalValue.setValueFrom value
-        null
-
-# WorkingInputSet
-
-`WorkingInputSet` defines the precise API that the rest of the code will use to understand and performantly
-manipulate inputs.
-
-    class HierarchicalInputKey
-      ###::
-
-      ###
-
-    class SingleLevelInputSet
-      ###::
-
-      ###
-
-    class HierarchicalInputSet
-      ###::
-        mapping: Map< String, any >
-      ###
-
-    class WorkingInputSet ###::implements StateSet< ???, ??? >###
-      ###::
-
-      ###
-
-      sampleKey: (key###: ???###)###: ???### ->
-
-      updateKey: (key###: ???###, value###: ???###) ->
+    # class DigitalToAnalogSpreader ###::implements StateSource< NormalizedFloat >###
+    #   ###::
+    #     range: FloatRange
+    #     orderedInputs: Array< DigitalInput >
+    #   ###
+    #   constructor: (@range, @orderedInputs) ->
+    #     assert.ok @orderedInputs.length > 0
