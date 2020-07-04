@@ -86,7 +86,7 @@ unflowify = require 'unflowify'
 _babelTransformSingleFile = do ->
   {transformFileAsync} = require '@babel/core'
   (inPath, outPath) ->
-    transformFileAsync inPath, {plugins: ["@babel/plugin-transform-react-jsx"]}
+    transformFileAsync inPath, {sourceMaps: yes, plugins: ["@babel/plugin-transform-react-jsx"]}
       .then ({code}) -> _writeFileReturnNewPath outPath, code
 
 babelTransformAllFiles = (replaceFn) -> (paths) ->
@@ -230,6 +230,7 @@ generateBundle = (outputFile, inputFiles) ->
   .transform (file, opts) -> new Coffeeify file, {
     bare: no
     header: yes
+    debug: yes
     transpile:
       presets: ["@babel/env", "@babel/react"]
     ...opts
@@ -247,7 +248,7 @@ compileFiles = do ->
   renameJsOutput = renameAll (f) -> f.replace /\.js$/, '.mjs'
   (paths) ->
     jsOutputPaths = paths.map getJsFileBasename
-    spawnPromise [coffeeCommandName, '-c', '--bare', '--no-header', ...paths]
+    spawnPromise [coffeeCommandName, '-c', '-m', '-M', '--bare', '--no-header', ...paths]
       .then -> renameJsOutput jsOutputPaths
 
 compileSass = (paths) ->
@@ -319,9 +320,12 @@ task 'check:flow', 'run the flow typechecker!', ->
   await spawnPromise ['flow', 'check']
 
 task 'clean', 'clean up generated output', ->
-  looseJsOrJsxFiles = await glob '**/*.{m,}js{,x}',
+  looseJsOrJsxFiles = await glob '**/*.{m,}js{,x}{,.map}',
     ignore: 'node_modules/**'
   await unlinkAll looseJsOrJsxFiles
+  looseCssFiles = await glob '**/*.css{,.map}',
+    ignore: 'node_modules/**'
+  await unlinkAll looseCssFiles
 
 task 'bundle', 'create a single merged javascript bundle', ({output = 'bundle.js'}) ->
   await unlinkIgnoringError output
