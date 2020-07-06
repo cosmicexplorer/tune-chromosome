@@ -33,11 +33,23 @@ class TypedMap ###::< K: TypedKey, V >###
     else
       undefined
 
+  getNow: (key###: K###)###: V### ->
+    ret = @get key
+    throw new Error("no value found for key #{key}") if ret is undefined
+    ret
+
   set: (key###: K###, value###: V###)###: TypedMap< K, V >### ->
     @tupleMap.set key.computeHash(), [key, value]
     @
 
   entries: -> @tupleMap.values()
+
+  @fromPairs###::< K: TypedKey, V >###: (pairs###: Array< [K, V] >###)###:: TypedMap< K, V >### =>
+    map###: TypedMap< K, V >### = new @
+    for [k, v] in pairs
+      map.set k, v
+    map
+
 
 
 module.exports = {TypedMap}

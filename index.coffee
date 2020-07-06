@@ -3,12 +3,14 @@
 React = require 'react'
 ReactDOM = require 'react-dom'
 
-{MainView} = require './frontend/views'
+{AppState, Main, Silence, ResourceMapping} = require './state-machine/operations'
+{ViewSwitcher} = require './frontend/views'
 
 reactStart = ->
   rootDiv = document.getElementById 'root'
   if rootDiv?
-    ReactDOM.render <MainView />, rootDiv
+    appState = new AppState Silence, new Main, ResourceMapping
+    ReactDOM.render <ViewSwitcher state={appState} />, rootDiv
   else
     throw new Error 'could not find tag #root!'
 

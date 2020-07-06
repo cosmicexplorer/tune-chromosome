@@ -3,6 +3,10 @@
     require 'regenerator-runtime/runtime'
 
     assert = require 'assert'
+    stringHash = require 'string-hash'
+
+    {TypedMap} = require '../util/collections'
+    {classOf} = require '../util/util'
 
 
 # Resource
@@ -12,18 +16,23 @@ We would prefer to use an `interface Resource`, but that causes Flow to blow up 
     class Resource
 
     class NullResource extends Resource
+      @computeHash: => stringHash @name
 
     class FilterRequest extends Resource
+      @computeHash: => stringHash @name
 
     class InputSetRequest extends Resource
+      @computeHash: => stringHash @name
 
     class FilterParameterRequest extends Resource
       ###::
         selectedInputs: InputSet
       ###
-      constructor: (selectedInputs###: InputSet###) ->
+      constructor: (@selectedInputs###: InputSet###) ->
         super()
         @selectedInputs = selectedInputs
+
+      @computeHash: => stringHash @name
 
 
 # InputControlsSpecification
@@ -58,7 +67,7 @@ Separate from [`InputMapping`](#inputmapping) -- this describes the *View's* int
 ## Main
 
     class Main ###:: implements View< NullResource, null >###
-      provides: -> NullResource
+      @provides: -> NullResource
 
 Pass in the state without modification, *ignore* the request, and return undefined.
 
@@ -70,7 +79,7 @@ Pass in the state without modification, *ignore* the request, and return undefin
 
 
     class FilterSelect ###:: implements View< FilterRequest, FilterNode >###
-      provides: -> FilterRequest
+      @provides: -> FilterRequest
 
 We similarly ignore the `request` here, as `FilterRequest` has no useful information in it at this time.
 
@@ -87,7 +96,7 @@ We similarly ignore the `request` here, as `FilterRequest` has no useful informa
 
 
     class SelectInput ###:: implements View< InputSetRequest, InputSet >###
-      provides: -> InputSetRequest
+      @provides: -> InputSetRequest
       switchTo: ->
         await return new InputSet [
           new InputAxisNode
@@ -101,7 +110,7 @@ We similarly ignore the `request` here, as `FilterRequest` has no useful informa
 
 
     class SelectFilterParameter ###:: implements View< FilterParameterRequest, RemapResult >###
-      provides: -> FilterParameterRequest
+      @provides: -> FilterParameterRequest
       switchTo: (request###: FilterParameterRequest###) ->
         {selectedInputs} = request
 
@@ -203,8 +212,8 @@ The `FilterNode` class follows:
 Retrieve the `source` and `output` nodes after asserting that they exist (i.e. that this FilterNode is "active" and has a specified input and output stream).
 
       assertPipedSourceOutput: ###: _pipedSourceOutput### ->
-        assert.ok @source?
-        assert.ok @output?
+        # assert.ok @source?
+        # assert.ok @output?
 
 We cast through any to satisfy Flow here. See https://flow.org/en/docs/types/casting/#toc-type-casting-through-any.
 
@@ -297,14 +306,18 @@ This class points somewhere into some nested FilterNode and into a setting on it
     class AppState
       ###::
         activeFilterNode: FilterNode
+        // TODO: Figure out a more type-safe way to represent this "some type that implements View"!
         activeView: any
-        // TODO: Figure out a more type-safe way to represent this run-time type-indexed map!
-        resourceMapping: { [any]: any }
+        resourceMapping: TypedMap< Class< Resource >, Class< View< any, any > > >
+        setResourceUICallback: any
       ###
       constructor: (@activeFilterNode, @activeView, @resourceMapping) ->
+        @setResourceUICallback = null
 
       requestResource: ###::< Res: Resource, Prod >### (resource###: Res###) ###: Promise< StateChangeResult< Prod > >### ->
-        nextView = @resourceMapping[Object.getPrototypeOf resource]
+        nextView = @resourceMapping.getNow classOf(resource)
+
+        @setResourceUICallback resource
 
         result = await nextView.switchTo resource
 
@@ -422,5 +435,16 @@ TODO: implement redo!
         return state
 
 
+    AllViews = [
+      Main
+      FilterSelect
+      SelectInput
+      SelectFilterParameter
+    ]
+    ResourceMapping = TypedMap.fromPairs ([viewCls.provides(), viewCls] for viewCls in AllViews)
 
-    module.exports = {Main, FilterSelect, SelectInput, SelectFilterParameter}
+
+    module.exports = {
+      Main, FilterSelect, SelectInput, SelectFilterParameter, ResourceMapping, AppState, Silence,
+      Resource, NullResource, FilterRequest, InputSetRequest, FilterParameterRequest, Select
+    }

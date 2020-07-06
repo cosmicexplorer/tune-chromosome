@@ -5,6 +5,8 @@ body
   font: 100% $font-stack
   color: $primary-color
 
+
+// Useful for react animations, which aren't working yet.
 .example-enter
   opacity: 0.01
 
@@ -17,4 +19,22 @@ body
 
   &.example-leave-active
     opacity: 0.01
-    transition: opaciity 300ms ease-in
+    transition: opacity 300ms ease-in
+
+
+=horizontally-centered
+  width: 50%
+  margin: 0 auto
+
+
+.main
+  +horizontally-centered
+
+.filter-select
+  +horizontally-centered
+
+.select-input
+  +horizontally-centered
+
+.select-filter-parameter
+  +horizontally-centered
