@@ -1,29 +1,15 @@
 @flow
 
+    require 'regenerator-runtime/runtime'
+
     assert = require 'assert'
-
-
-# Utils
-TODO: Maybe upstream these into lodash!!!??
-
-
-    splitArrayAt = ###::<T>###(arr ###: Array<T>###, i ###: number###) ###: [Array<T>, Array<T>]### ->
-      assert.ok i > 0
-      assert.ok i < arr.length
-      left = arr[..i]
-      right = arr[i..]
-      [left, right]
-
-    # TODO: generic memoize function here!!
-    # memoize = ###::<Fn>### (fn###: Fn###)###: ###
 
 
 # Resource
 
-We would prefer to uses an `interface Resource`, but that causes Flow to blow up when trying to use the interface `Resource` as a trait bound elsewhere.
+We would prefer to use an `interface Resource`, but that causes Flow to blow up when trying to use the interface `Resource` as a trait bound elsewhere.
 
     class Resource
-
 
     class NullResource extends Resource
 
@@ -35,8 +21,9 @@ We would prefer to uses an `interface Resource`, but that causes Flow to blow up
       ###::
         selectedInputs: InputSet
       ###
-      constructor: (@selectedInputs) ->
+      constructor: (selectedInputs###: InputSet###) ->
         super()
+        @selectedInputs = selectedInputs
 
 
 # InputControlsSpecification
@@ -87,13 +74,14 @@ Pass in the state without modification, *ignore* the request, and return undefin
 
 We similarly ignore the `request` here, as `FilterRequest` has no useful information in it at this time.
 
-      switchTo: (_request) ->
+      switchTo: ->
         # TODO: return something other than the Silence filter!!!
         await return Silence
 
 
 ## SelectInput
 
+    class InputAxis
 
     class DigitalKey extends InputAxis
 
@@ -114,7 +102,8 @@ We similarly ignore the `request` here, as `FilterRequest` has no useful informa
 
     class SelectFilterParameter ###:: implements View< FilterParameterRequest, RemapResult >###
       provides: -> FilterParameterRequest
-      switchTo: ({selectedInputs}) ->
+      switchTo: (request###: FilterParameterRequest###) ->
+        {selectedInputs} = request
 
         assert.equal 1, selectedInputs.axes.length
         [axisNode] = selectedInputs.axes
@@ -135,6 +124,7 @@ We similarly ignore the `request` here, as `FilterRequest` has no useful informa
       ###::
         inputMapping: InputMapping
       ###
+      # $FlowFixMe
       constructor: (@inputMapping) ->
 
 
@@ -152,6 +142,7 @@ Contrast to [`AppState`](#appstate)!
       ###::
         inputMapping: InputMapping
       ###
+      # $FlowFixMe
       constructor: (@inputMapping) ->
 
 
@@ -163,16 +154,16 @@ A `FilterNode` is a wrapper for a node in a vast searchable graph of all `Filter
     ###::
       interface FilterNodeAgglomeration {}
 
-      type _pipeOptions = {
+      type _pipeOptions = {|
         source: FilterNode,
         output: FilterNode,
         name?: ?string,
-      }
+      |}
 
-      type _pipedSourceOutput = {
+      type _pipedSourceOutput = {|
         source: FilterNode,
         output: FilterNode,
-      }
+      |}
     ###
 
 - `name` contains a reference to the entire prototype chain of filters for fuzzy matching at the speed of thought (like emacs buffer searching by name with helm!!!).
@@ -182,6 +173,16 @@ A `FilterNode` is a wrapper for a node in a vast searchable graph of all `Filter
 
 The `FilterNode` class follows:
 
+    ###::
+      type _filterOpts = {|
+        filter: Filter,
+        name: string,
+        source: ?FilterNode,
+        output: ?FilterNode,
+        timestamp: Date,
+      |}
+    ###
+
     class FilterNode
       ###::
         filter: Filter
@@ -190,7 +191,13 @@ The `FilterNode` class follows:
         output: ?FilterNode
         timestamp: Date
       ###
-      constructor: ({@filter, @name, @source, @output, @timestamp}) ->
+      constructor: (opts###: _filterOpts###) ->
+        {filter, name, source, output, timestamp} = opts
+        @filter = filter
+        @name = name
+        @source = source
+        @output = output
+        @timestamp = timestamp
 
 
 Retrieve the `source` and `output` nodes after asserting that they exist (i.e. that this FilterNode is "active" and has a specified input and output stream).
@@ -227,7 +234,14 @@ Immediately after selecting a filter, we expect the node we receive to have been
 
 # Input{Axis,Set,Mapping}
 
-    class InputAxis
+
+    ###::
+      type _inputAxisNodeOpts = {|
+        name: string,
+        axis: InputAxis,
+        filterParameter?: ?FilterParameter,
+      |}
+    ###
 
     class InputAxisNode
       ###::
@@ -235,12 +249,17 @@ Immediately after selecting a filter, we expect the node we receive to have been
         axis: InputAxis
         filterParameter: ?FilterParameter
       ###
-      constructor: ({@name, @axis, @filterParameter = null}) ->
+      constructor: (opts###: _inputAxisNodeOpts###) ->
+        {name, axis, filterParameter = null} = opts
+        @name = name
+        @axis = axis
+        @filterParameter = filterParameter
 
     class InputSet
       ###::
         axes: Array< InputAxisNode >
       ###
+      # $FlowFixMe
       constructor: (@axes) ->
 
       isEmpty: -> @axes.length is 0
@@ -258,6 +277,7 @@ This class points somewhere into some nested FilterNode and into a setting on it
       ###::
         mapping: {[string]: InputAxisNode}
       ###
+      # $FlowFixMe
       constructor: (@mapping) ->
 
     Silence = new FilterNode
@@ -279,7 +299,7 @@ This class points somewhere into some nested FilterNode and into a setting on it
         activeFilterNode: FilterNode
         activeView: any
         // TODO: Figure out a more type-safe way to represent this run-time type-indexed map!
-        resourceMapping: { [Function]: any }
+        resourceMapping: { [any]: any }
       ###
       constructor: (@activeFilterNode, @activeView, @resourceMapping) ->
 
@@ -400,3 +420,7 @@ TODO: implement redo!
 
         {state} = await state.requestResource new NullResource
         return state
+
+
+
+    module.exports = {Main, FilterSelect, SelectInput, SelectFilterParameter}

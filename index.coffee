@@ -3,12 +3,12 @@
 React = require 'react'
 ReactDOM = require 'react-dom'
 
-{AnimatedObject} = require './frontend/app'
+{MainView} = require './frontend/views'
 
 reactStart = ->
   rootDiv = document.getElementById 'root'
   if rootDiv?
-    ReactDOM.render <AnimatedObject me="me2" />, rootDiv
+    ReactDOM.render <MainView />, rootDiv
   else
     throw new Error 'could not find tag #root!'
 

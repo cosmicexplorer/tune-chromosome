@@ -4,37 +4,37 @@
 
 ###::
 type Props = {|
-  me: string,
+  me: ?string,
 |}
 
 type State = Array<string>
 ###
 
-AnimatedObject = (props###: Props###) ->
-  {me = 'me'} = props
-  [items, setItems] = useState###::< State >###([
-    'hello'
-    'world'
-    'click'
-    me
-  ])
-  useEffect ->
-    # Do stateful, business logic stuff when the element is rendered...
-    # Then return a method which performs any business logic cleanup stuff!
-    ->
+# ExampleComponent = (props###: Props###) ->
+#   {me = 'me'} = props
+#   [items, setItems] = useState###::< State >###([
+#     'hello'
+#     'world'
+#     'click'
+#     me
+#   ])
+#   useEffect ->
+#     # Do stateful, business logic stuff when the element is rendered...
+#     # Then return a closure which performs any business logic cleanup stuff!
+#     ->
 
-  appendItem = -> setItems [items..., prompt('Enter some text')]
+#   appendItem = -> setItems [items..., prompt('Enter some text')]
 
-  removeItem = (i###: number###) -> setItems items.filter (_, j) -> i isnt j
+#   removeItem = (i###: number###) -> setItems items.filter (_, j) -> i isnt j
 
-  renderedItems = items.map (item, i) ->
-    <div key={item} onClick={-> removeItem i}>
-      {item}
-    </div>
+#   renderedItems = items.map (item, i) ->
+#     <div key={item} onClick={-> removeItem i}>
+#       {item}
+#     </div>
 
-  <div>
-    <button onClick={appendItem}>Add Item</button>
-    {renderedItems}
-  </div>
+#   <div>
+#     <button onClick={appendItem}>Add Item</button>
+#     {renderedItems}
+#   </div>
 
-module.exports = {AnimatedObject}
+# module.exports = {ExampleComponent}

@@ -231,6 +231,7 @@ generateBundle = (outputFile, inputFiles) ->
     bare: no
     header: yes
     debug: yes
+    literate: (file.match /\.litcoffee$/)?
     transpile:
       presets: ["@babel/env", "@babel/react"]
     ...opts
