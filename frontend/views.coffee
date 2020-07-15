@@ -3,17 +3,17 @@
 {
   AppState, Main, FilterSelect, SelectInput, SelectFilterParameter, Silence,
   NullResource, FilterRequest, InputSetRequest, FilterParameterRequest,
-  Select,
+  Select, ResourceMapping,
 } = require '../state-machine/operations'
 {classOf} = require '../util/util'
 
 {useState, useEffect} = React = require 'react'
 
 
-MainView = ({selectOperator, appState}) ->
+MainView = ({selectOperator, appState, setAppState}) ->
   <div className="main">
     <p>MAIN</p>
-    <button onClick={-> selectOperator.invoke appState}>Select Filter</button>
+    <button onClick={-> setAppState selectOperator.invoke(appState)}>Select Filter</button>
   </div>
 
 
@@ -35,20 +35,17 @@ SelectFilterParameterView = ->
   </div>
 
 
-###::
-  type _viewSwitcherProps = {|
-    state: AppState,
-  |}
-###
-
-ViewSwitcher = ({state: appState}) ->
+ViewSwitcher = ->
   [resource, setResource] = useState###::< Resource >###(new NullResource)
-  # FIXME: this basically monkey patches in the UI change to the AppState instance after the fact?
-  appState.setResourceUICallback = setResource
+  useEffect -> ->
+
+  [appState, setAppState] = useState###::< AppState >###(
+    new AppState Silence, new Main, ResourceMapping, setResource)
   useEffect -> ->
 
   switch classOf resource
-    when NullResource then <MainView appState={appState} selectOperator={new Select} />
+    when NullResource then <MainView
+      selectOperator={new Select} appState={appState} setAppState={setAppState} />
     when FilterRequest then <FilterSelectView />
     when InputSetRequest then <SelectInputView />
     when FilterParameterRequest then <SelectFilterParameterView />

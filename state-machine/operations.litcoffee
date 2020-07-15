@@ -212,6 +212,7 @@ The `FilterNode` class follows:
 Retrieve the `source` and `output` nodes after asserting that they exist (i.e. that this FilterNode is "active" and has a specified input and output stream).
 
       assertPipedSourceOutput: ###: _pipedSourceOutput### ->
+        # TODO: why would we assume these are correct???
         # assert.ok @source?
         # assert.ok @output?
 
@@ -311,8 +312,7 @@ This class points somewhere into some nested FilterNode and into a setting on it
         resourceMapping: TypedMap< Class< Resource >, Class< View< any, any > > >
         setResourceUICallback: any
       ###
-      constructor: (@activeFilterNode, @activeView, @resourceMapping) ->
-        @setResourceUICallback = null
+      constructor: (@activeFilterNode, @activeView, @resourceMapping, @setResourceUICallback) ->
 
       requestResource: ###::< Res: Resource, Prod >### (resource###: Res###) ###: Promise< StateChangeResult< Prod > >### ->
         nextView = @resourceMapping.getNow classOf(resource)
