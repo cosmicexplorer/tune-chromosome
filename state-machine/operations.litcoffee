@@ -4,8 +4,12 @@
 
     assert = require 'assert'
     stringHash = require 'string-hash'
+    {v4: uuidv4} = require 'uuid'
 
     {TypedMap} = require '../util/collections'
+    ###::
+      import type {TypedKey} from '../util/collections';
+    ###
     {classOf} = require '../util/util'
 
 
@@ -13,26 +17,34 @@
 
 We would prefer to use an `interface Resource`, but that causes Flow to blow up when trying to use the interface `Resource` as a trait bound elsewhere.
 
-    class Resource
+    ###::
+      export type SetAppStateCallback = (AppState) => void;
+    ###
+
+    class Resource###:: implements TypedKey###
+      ###::
+        setAppState: SetAppStateCallback
+        uuid: string
+      ###
+      constructor: (setAppState###: SetAppStateCallback###) ->
+        @setAppState = setAppState
+        @uuid = uuidv4()
+
+      computeHash: -> stringHash @uuid
 
     class NullResource extends Resource
-      @computeHash: => stringHash @name
 
     class FilterRequest extends Resource
-      @computeHash: => stringHash @name
 
     class InputSetRequest extends Resource
-      @computeHash: => stringHash @name
 
     class FilterParameterRequest extends Resource
       ###::
         selectedInputs: InputSet
       ###
-      constructor: (@selectedInputs###: InputSet###) ->
-        super()
+      constructor: (setAppState###: SetAppStateCallback###, selectedInputs###: InputSet###) ->
+        super setAppState
         @selectedInputs = selectedInputs
-
-      @computeHash: => stringHash @name
 
 
 # InputControlsSpecification
@@ -56,10 +68,10 @@ Separate from [`InputMapping`](#inputmapping) -- this describes the *View's* int
 
 # Views
 
+TODO: add some functionality to the `View` interface?
+
     ###::
       interface View< Res: Resource, Product > {
-        provides(): Class< Res >;
-        switchTo(request: Res): Promise< Product >;
       }
     ###
 
@@ -67,25 +79,11 @@ Separate from [`InputMapping`](#inputmapping) -- this describes the *View's* int
 ## Main
 
     class Main ###:: implements View< NullResource, null >###
-      @provides: -> NullResource
-
-Pass in the state without modification, *ignore* the request, and return undefined.
-
-      switchTo: ->
-        await return null
-
 
 ## FilterSelect
 
 
     class FilterSelect ###:: implements View< FilterRequest, FilterNode >###
-      @provides: -> FilterRequest
-
-We similarly ignore the `request` here, as `FilterRequest` has no useful information in it at this time.
-
-      switchTo: ->
-        # TODO: return something other than the Silence filter!!!
-        await return Silence
 
 
 ## SelectInput
@@ -96,38 +94,12 @@ We similarly ignore the `request` here, as `FilterRequest` has no useful informa
 
 
     class SelectInput ###:: implements View< InputSetRequest, InputSet >###
-      @provides: -> InputSetRequest
-      switchTo: ->
-        await return new InputSet [
-          new InputAxisNode
-            name: 'digital-key'
-            axis: new DigitalKey
-            filterParameter: null
-        ]
 
 
 ## SelectFilterParameter
 
 
     class SelectFilterParameter ###:: implements View< FilterParameterRequest, RemapResult >###
-      @provides: -> FilterParameterRequest
-      switchTo: (request###: FilterParameterRequest###) ->
-        {selectedInputs} = request
-
-        assert.equal 1, selectedInputs.axes.length
-        [axisNode] = selectedInputs.axes
-
-        assert.ok not axisNode.filterParameter?
-
-        mappedAxisNode = new InputAxisNode
-          name: axisNode.name
-          axis: axisNode.axis
-          # TODO: actually add logic to choose a specific FilterParameter here!!
-          filterParameter: new FilterParameter
-
-        newMapping = new InputMapping {[mappedAxisNode.name]: mappedAxisNode}
-
-        await return new RemapResult newMapping
 
     class RemapResult
       ###::
@@ -283,15 +255,24 @@ This class points somewhere into some nested FilterNode and into a setting on it
 
     class FilterParameter
 
+    class FilterName###:: implements TypedKey###
+      ###::
+        name: string
+      ###
+      constructor: (name###: string###) ->
+        @name = name
+
+      computeHash: -> stringHash @name
+
     class InputMapping
       ###::
-        mapping: {[string]: InputAxisNode}
+        mapping: TypedMap< FilterName, InputAxisNode >
       ###
-      # $FlowFixMe
-      constructor: (@mapping) ->
+      constructor: (mapping###: TypedMap< FilterName, InputAxisNode >###) ->
+        @mapping = mapping
 
     Silence = new FilterNode
-      filter: new Filter new InputMapping {}
+      filter: new Filter new InputMapping new TypedMap
       name: ''
       source: null
       output: null
@@ -303,30 +284,64 @@ This class points somewhere into some nested FilterNode and into a setting on it
 # AppState
 **`AppState` represents the state of the entire application, such that it can be precisely reconstructed later, upon app startup, to drop the user into the exact same visuals, input mapping, and view.** This is in contrast to [`Filter`s](#filters), which represent just the state of a particular sound being iterated on at some point (this is intentionally decoupled from app state).
 
+    ###::
+      type _resourceMapping = TypedMap< Resource, [(any) => void, (any) => void] >
+    ###
 
     class AppState
       ###::
         activeFilterNode: FilterNode
-        // TODO: Figure out a more type-safe way to represent this "some type that implements View"!
-        activeView: any
-        resourceMapping: TypedMap< Class< Resource >, Class< View< any, any > > >
-        setResourceUICallback: any
+        activeView: View< any, any >
+        activeResource: Resource
+        resourceMapping: _resourceMapping
       ###
-      constructor: (@activeFilterNode, @activeView, @resourceMapping, @setResourceUICallback) ->
+      constructor: (activeFilterNode###: FilterNode###, activeView###: View< any, any >###, resourceMapping###: _resourceMapping###) ->
+        @activeFilterNode = activeFilterNode
+        @activeView = activeView
+        @activeResource = (null###: any###)
+        @resourceMapping = resourceMapping
 
       requestResource: ###::< Res: Resource, Prod >### (resource###: Res###) ###: Promise< StateChangeResult< Prod > >### ->
-        nextView = @resourceMapping.getNow classOf(resource)
+        # Ensure this method is only ever run a single time per resource request.
+        assert.ok not @resourceMapping.has resource
 
-        @setResourceUICallback resource
+        nextView = switch classOf resource
+          when NullResource then new Main
+          when FilterRequest then new FilterSelect
+          when InputSetRequest then new SelectInput
+          when FilterParameterRequest then new SelectFilterParameter
+          else throw resource
 
-        result = await nextView.switchTo resource
+NB: This is very complex logic to convert a callback into a Promise!! See comments.
 
-        prototypeChainState = Object.create @
+        getResult = new Promise (resolve, reject) =>
 
-        prototypeChainState.activeView = nextView
+This method will take a callback, and when right before the callback is executed, delete the entry corresponding to `resource` from `@resourceMapping`.
 
-        return new StateChangeResult result, prototypeChainState
+          wrapCallback = (cb) => (args...) =>
+            @resourceMapping.delete resource
+            cb args...
 
+Before returning execution back to the body of `requestResource`, add the `resolve` and `reject` methods to `@resourceMapping`.
+
+          @resourceMapping.set resource, [
+            wrapCallback(resolve),
+            wrapCallback(reject),
+          ]
+          undefined
+
+NB: Creating a new object with `Object.create()` is necessary for `.setAppState()` to register a changed state!
+
+        prototypeChainObject = Object.create @
+        prototypeChainObject.activeView = nextView
+        prototypeChainObject.activeResource = resource
+        resource.setAppState prototypeChainObject
+
+Await the promise created above, which will be triggered asynchronously by UI interactions which extract the `[resolve, reject]` method pair from `@resourceMapping`.
+
+        result = (await getResult###: Prod###)
+
+        return new StateChangeResult result, prototypeChainObject
 
 
 # Operations
@@ -335,7 +350,7 @@ This class points somewhere into some nested FilterNode and into a setting on it
 
     ###::
       interface Operation {
-        invoke(state: AppState): Promise< AppState >;
+        invoke(state: AppState, setAppState: SetAppStateCallback): Promise< AppState >;
       }
     ###
 
@@ -351,10 +366,10 @@ The `Append` class follows:
 
 
     class Append ###:: implements Operation###
-      invoke: (state) ->
+      invoke: (state###: AppState###, setAppState###: SetAppStateCallback###)###: Promise< AppState >### ->
         {activeFilterNode} = state
 
-        {product: selectedFilterNode, state} = await state.requestResource ###::< _, FilterNode >### (new FilterRequest)
+        {product: selectedFilterNode, state} = await state.requestResource ###::< _, FilterNode >### (new FilterRequest setAppState)
 
 
 Immediately after selecting a filter, we expect the node we receive to have been sanitized of input and output. The input and output is controlled by the *user*, *elsewhere*!
@@ -374,77 +389,51 @@ It's still **absolutely bonkers** to me that we can just *mutate* `state.activeF
 
         state.activeFilterNode = combinedNode
 
-        {state} = await state.requestResource new NullResource
+        {state} = await state.requestResource new NullResource setAppState
         return state
 
 
 ## Select
 
     class Select ###:: implements Operation###
-      invoke: (state) ->
+      invoke: (state###: AppState###, setAppState###: SetAppStateCallback###)###: Promise< AppState >### ->
         {activeFilterNode} = state
         {source, output} = activeFilterNode.assertPipedSourceOutput()
 
 Note how here, the variable `state` is both dereferenced and assigned to in a single statement. CoffeeScript's destructuring powers can enable this **effortlessly fluent stateful programming!!!**.
 
-
-        {product: selectedFilterNode, state} = await state.requestResource ###::< _, FilterNode >### (new FilterRequest)
-
+        {product: selectedFilterNode, state} = await state.requestResource ###::< _, FilterNode >### (new FilterRequest setAppState)
 
 Here again, we can modify the state, then ask it to send us home.
 
-
         state.activeFilterNode = selectedFilterNode.pipe {source, output}
 
-        {state} = await state.requestResource new NullResource
+        {state} = await state.requestResource new NullResource setAppState
         return state
 
 
-## Undo
-
-Extremely similar to `Select`, but simply follows the `.source` field from the active `FilterNode`. Note that `source` and `output` form a doubly-linked list of `FilterNode`s.
-
-    class Undo ###:: implements Operation###
-      invoke: (state) ->
-        {activeFilterNode: {source}} = state
-
-        throw new Error("TODO: undo without a previous filter") unless source?
-
-        state.activeFilterNode = source
-
-        {state} = await state.requestResource new NullResource
-        return state
-
-TODO: implement redo!
+## Undo/Redo
+TODO: implement undo/redo!
 
 
 ## AffixRemap
 
-
     class AffixRemap ###:: implements Operation###
-      invoke: (state) ->
+      invoke: (state###: AppState###, setAppState###: SetAppStateCallback###)###: Promise< AppState >### ->
         # TODO: reverse this logic -- we will want to select the FilterParameter first, *then* the input control to map it to!!
-        {product: selectedInput, state} = await state.requestResource ###::< _, InputSet >### (new InputSetRequest)
+        {product: selectedInput, state} = await state.requestResource ###::< _, InputSet >### (new InputSetRequest setAppState)
 
         {product: {inputMapping: remapResult}, state} = (
-          await state.requestResource ###::< _, RemapResult >### (new FilterParameterRequest selectedInput))
+          await state.requestResource ###::< _, RemapResult >### (new FilterParameterRequest setAppState, selectedInput))
 
         state.activeFilterNode = state.activeFilterNode.remap remapResult
 
-        {state} = await state.requestResource new NullResource
+        {state} = await state.requestResource new NullResource setAppState
         return state
 
 
-    AllViews = [
-      Main
-      FilterSelect
-      SelectInput
-      SelectFilterParameter
-    ]
-    ResourceMapping = TypedMap.fromPairs ([viewCls.provides(), viewCls] for viewCls in AllViews)
-
-
     module.exports = {
-      Main, FilterSelect, SelectInput, SelectFilterParameter, ResourceMapping, AppState, Silence,
-      Resource, NullResource, FilterRequest, InputSetRequest, FilterParameterRequest, Select
+      Main, FilterSelect, SelectInput, SelectFilterParameter, AppState, Silence,
+      Resource, NullResource, FilterRequest, InputSetRequest, FilterParameterRequest, Select,
+      InputMapping, Filter, FilterNode,
     }

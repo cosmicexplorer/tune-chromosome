@@ -1,9 +1,7 @@
 # @flow
 
-assert = require 'assert'
-
 ###::
-  interface TypedKey {
+  export interface TypedKey {
     computeHash(): number;
   }
 ###
@@ -35,7 +33,8 @@ class TypedMap ###::< K: TypedKey, V >###
 
   getNow: (key###: K###)###: V### ->
     ret = @get key
-    throw new Error("no value found for key #{key}") if ret is undefined
+    throw new Error("no value found for key #{key.toString()}") if ret is undefined
+    # $FlowFixMe
     ret
 
   set: (key###: K###, value###: V###)###: TypedMap< K, V >### ->
@@ -44,7 +43,7 @@ class TypedMap ###::< K: TypedKey, V >###
 
   entries: -> @tupleMap.values()
 
-  @fromPairs###::< K: TypedKey, V >###: (pairs###: Array< [K, V] >###)###:: TypedMap< K, V >### =>
+  @fromPairs###::< K: TypedKey, V >###: (pairs###: Array< [K, V] >###)###: TypedMap< K, V >### =>
     map###: TypedMap< K, V >### = new @
     for [k, v] in pairs
       map.set k, v

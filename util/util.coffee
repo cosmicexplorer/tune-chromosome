@@ -1,5 +1,8 @@
 # @flow
 
-classOf = (x) -> Object.getPrototypeOf(x).constructor
+
+classOf = ###::< T >###(x###: T###)###: Class<T>### ->
+  # $FlowFixMe
+  Object.getPrototypeOf(x).constructor
 
 module.exports = {classOf}

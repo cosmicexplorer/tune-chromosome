@@ -1,25 +1,64 @@
 # @flow
 
+require 'regenerator-runtime/runtime'
+
 {
   AppState, Main, FilterSelect, SelectInput, SelectFilterParameter, Silence,
-  NullResource, FilterRequest, InputSetRequest, FilterParameterRequest,
-  Select, ResourceMapping,
+  Select, Filter, InputMapping, NullResource, FilterNode, Resource,
 } = require '../state-machine/operations'
+###::
+  import type {SetAppStateCallback} from '../state-machine/operations';
+###
+
+{TypedMap} = require '../util/collections'
 {classOf} = require '../util/util'
 
 {useState, useEffect} = React = require 'react'
 
 
-MainView = ({selectOperator, appState, setAppState}) ->
+###::
+  type _mainOptions = {|
+    selectOperator: Select,
+    appState: AppState,
+    setAppState: SetAppStateCallback,
+  |}
+###
+MainView = (opts###: _mainOptions###) ->
+  {selectOperator, appState, setAppState} = opts
   <div className="main">
     <p>MAIN</p>
-    <button onClick={-> setAppState selectOperator.invoke(appState)}>Select Filter</button>
+    <button onClick={-> setAppState await selectOperator.invoke appState, setAppState}>
+      Select Filter
+    </button>
   </div>
 
 
-FilterSelectView = ->
+###::
+  type _filterSelectOptions = {|
+    appState: AppState,
+    resource: Resource,
+  |}
+###
+FilterSelectView = (opts###: _filterSelectOptions###) ->
+  {appState, resource} = opts
+  [filterState, setFilterState] = useState###::< Filter >###(
+    new Filter new InputMapping new TypedMap)
+  useEffect -> ->
+
+  [resolveFilter, _reject] = appState.resourceMapping.getNow resource
   <div className="filter-select">
     <p>FILTER-SELECT</p>
+    <button onClick={->
+      pipedNode = new FilterNode
+        filter: filterState
+        name: ''
+        source: null
+        output: null
+        timestamp: new Date
+      resolveFilter pipedNode
+    }>
+      Confirm Filter Selection
+    </button>
   </div>
 
 
@@ -36,20 +75,19 @@ SelectFilterParameterView = ->
 
 
 ViewSwitcher = ->
-  [resource, setResource] = useState###::< Resource >###(new NullResource)
-  useEffect -> ->
-
   [appState, setAppState] = useState###::< AppState >###(
-    new AppState Silence, new Main, ResourceMapping, setResource)
+    new AppState Silence, new Main, new TypedMap)
   useEffect -> ->
 
-  switch classOf resource
-    when NullResource then <MainView
+  {activeView, activeResource} = appState
+
+  switch classOf activeView
+    when Main then <MainView
       selectOperator={new Select} appState={appState} setAppState={setAppState} />
-    when FilterRequest then <FilterSelectView />
-    when InputSetRequest then <SelectInputView />
-    when FilterParameterRequest then <SelectFilterParameterView />
-    else throw resource
+    when FilterSelect then <FilterSelectView appState={appState} resource={activeResource} />
+    when SelectInput then <SelectInputView />
+    when SelectFilterParameter then <SelectFilterParameterView />
+    else throw activeView
 
 
 module.exports = {ViewSwitcher}
