@@ -1,0 +1,111 @@
+<p>@flow</p>
+<pre><code>stringHash = require &#39;string-hash&#39;
+
+###::
+  import type {TypedKey} from &#39;../util/collections&#39;;
+###</code></pre>
+<h1 id="filtername">FilterName</h1>
+<pre><code>class FilterName ###:: implements TypedKey###
+  ###::
+    name: string
+  ###
+  constructor: (name###: string###) -&gt;
+    @name = name
+
+  computeHash: -&gt; stringHash @name</code></pre>
+<h1 id="filter">Filter</h1>
+<p><code>Filter</code>s have controls and convert an input stream to an output stream!</p>
+<p><strong>Filters represent &quot;the state of making and iterating on a sound&quot; as atomically as possible.</strong> By selecting a filter, the user should be able to:</p>
+<ol>
+<li>immediately hear the exact sound they heard before when last playing the filter, and</li>
+<li>immediately have the ability to use the exact same InputMapping as when last playing the filter!</li>
+</ol>
+<p>Contrast to <a href="../state-machine/operations.html#appstate"><code>AppState</code></a>!</p>
+<pre><code>class Filter
+  ###::
+    inputMapping: InputMapping
+  ###
+  # $FlowFixMe
+  constructor: (@inputMapping) -&gt;</code></pre>
+<h1 id="filternode">FilterNode</h1>
+<p>A <code>FilterNode</code> is a wrapper for a node in a vast searchable graph of all <code>Filter</code>s! This means it contains the information required to effectively index and search filters later, in the finely-tuned <code>filter-select</code> view. It will also need to contain sufficient information to allow for <code>select-filter-parameter</code> to traverse nodes efficiently.</p>
+<p><strong>Filters are a &quot;sound state&quot;, and FilterNodes are an index into a field (TODO: a math field????) to traverse sound states!!!!</strong></p>
+<pre><code>_filterNodeSeparator = &#39;/&#39;
+
+###::
+  interface FilterNodeAgglomeration {}
+
+  type _pipeOptions = {|
+    source: FilterNode,
+    output: FilterNode,
+    name?: ?string,
+  |}
+
+  type _pipedSourceOutput = {|
+    source: FilterNode,
+    output: FilterNode,
+  |}
+###</code></pre>
+<ul>
+<li><code>name</code> contains a reference to the entire prototype chain of filters for fuzzy matching at the speed of thought (like emacs buffer searching by name with helm!!!).
+<ul>
+<li><code>name</code> can also be set afterwards to &quot;pin&quot; or &quot;save&quot; specific filters with short abbreviations.</li>
+</ul></li>
+<li><code>source</code> and <code>output</code> allow traversing sources step by step by walking &quot;between&quot; them.</li>
+<li><code>timestamp</code> enables time travel view (chronological search) through filters!</li>
+</ul>
+<p>The <code>FilterNode</code> class follows:</p>
+<pre><code>###::
+  type _filterOpts = {|
+    filter: Filter,
+    name: string,
+    source: ?FilterNode,
+    output: ?FilterNode,
+    timestamp: Date,
+  |}
+###
+
+class FilterNode
+  ###::
+    filter: Filter
+    name: string
+    source: ?FilterNode
+    output: ?FilterNode
+    timestamp: Date
+  ###
+  constructor: (opts###: _filterOpts###) -&gt;
+    {filter, name, source, output, timestamp} = opts
+    @filter = filter
+    @name = name
+    @source = source
+    @output = output
+    @timestamp = timestamp</code></pre>
+<p>Retrieve the <code>source</code> and <code>output</code> nodes after asserting that they exist (i.e. that this FilterNode is &quot;active&quot; and has a specified input and output stream).</p>
+<pre><code>  assertPipedSourceOutput: ###: _pipedSourceOutput### -&gt;
+    # TODO: why would we assume these are correct???
+    # assert.ok @source?
+    # assert.ok @output?</code></pre>
+<p>We cast through any to satisfy Flow here. See <a href="https://flow.org/en/docs/types/casting/#toc-type-casting-through-any" class="uri">https://flow.org/en/docs/types/casting/#toc-type-casting-through-any</a>.</p>
+<pre><code>    {source, output} = {@source, @output}
+    source2 = (source###: any###)
+    output2 = (output###: any###)
+    {source: source2, output: output2}
+
+  pipe: (options###: _pipeOptions###) ###: FilterNode### -&gt;
+    {source, output, name = null} = options</code></pre>
+<p>Immediately after selecting a filter, we expect the node we receive to have been sanitized of input and output. The input and output is <strong>controlled by the user</strong>, <em>elsewhere!</em></p>
+<pre><code>    assert.ok not @source?
+    assert.ok not @output?
+
+    new FilterNode
+      filter: @filter
+      name: name ? @name
+      source: source
+      output: output
+      timestamp: new Date
+
+  remap: (inputMapping###: InputMapping###)###: FilterNode### -&gt;
+    throw new Error(&quot;TODO: unimplemented!!!&quot;)</code></pre>
+<h2 id="filterparameter">FilterParameter</h2>
+<p>This class points somewhere into some nested <a href="#filter-node"><code>FilterNode</code></a> and into a setting on its contained <a href="#filter"><code>Filter</code></a>. Note that a Filter will have its own InputMapping as well. <strong>RECURSION!</strong></p>
+<pre><code>class FilterParameter</code></pre>

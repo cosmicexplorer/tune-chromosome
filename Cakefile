@@ -218,6 +218,8 @@ matchesCoffeeSourceFile = (f) -> (recognizedCoffeeSourceExtensions.find (ext) ->
 globCoffeeSources = ->
   _.flatten await Promise.all (glob "**/*#{ext}" for ext in recognizedCoffeeSourceExtensions)
 
+globLitcoffeeSources = -> await glob "**/*.litcoffee"
+
 globSassSources = -> await glob "**/*.sass"
 
 generateBundle = (outputFile, inputFiles) ->
@@ -252,6 +254,13 @@ compileFiles = do ->
     spawnPromise [coffeeCommandName, '-c', '-m', '-M', '--bare', '--no-header', ...paths]
       .then -> renameJsOutput jsOutputPaths
 
+compileLitcoffee = (paths) ->
+  htmlOutputPaths = paths.map (f) -> f.replace /\.litcoffee$/, '.html'
+  allPandocInvocations = (_.zip paths, htmlOutputPaths).map ([inF, outF]) ->
+    spawnPromise ['pandoc', '-f', 'markdown_github', '-t', 'html', inF, '-o', outF]
+  Promise.all allPandocInvocations
+    .then -> htmlOutputPaths
+
 compileSass = (paths) ->
   cssOutputPaths = paths.map (f) -> f.replace /\.sass$/, '.css'
   joinedCssInOutArgs = (_.zip paths, cssOutputPaths).map ([inF, outF]) -> "#{inF}:#{outF}"
@@ -260,7 +269,11 @@ compileSass = (paths) ->
 
 # Build tasks.
 task 'build', 'build everything', ->
-  await Promise.all [(invoke 'build:coffee'), (invoke 'build:sass')]
+  await Promise.all [
+    (invoke 'build:coffee'),
+    (invoke 'build:sass'),
+    (invoke 'build:litcoffee'),
+  ]
 
 selectInvalidatedCompiles = (filenamePairs) -> await for [inF, outF] in filenamePairs
   {mtimeMs: inputFileModificationTime} = await fs.promises.stat inF
@@ -307,6 +320,17 @@ task 'build:sass', 'compile all .sass files', ->
 
   assert.deepEqual invalidatedCssOutputs, await compileSass invalidatedSassSources
 
+task 'build:litcoffee', 'compile all .litcoffee files to html', ->
+  litcoffeeSources = await globLitcoffeeSources()
+  htmlOutputs = litcoffeeSources.map (f) -> f.replace /\.litcoffee$/, '.html'
+
+  [invalidatedLitcoffeeSources = [], invalidatedHtmlOutputs = []] =
+    _.unzip await selectInvalidatedCompiles (_.zip litcoffeeSources, htmlOutputs)
+
+  return if _.isEmpty invalidatedLitcoffeeSources
+
+  assert.deepEqual invalidatedHtmlOutputs, await compileLitcoffee invalidatedLitcoffeeSources
+
 task 'check', 'run all tests and static analysis', ->
   await invoke 'check:flow'
 
@@ -321,15 +345,18 @@ task 'check:flow', 'run the flow typechecker!', ->
   await spawnPromise ['flow', 'check']
 
 task 'clean', 'clean up generated output', ->
-  looseJsOrJsxFiles = await glob '**/*.{m,}js{,x}{,.map}',
-    ignore: 'node_modules/**'
-  await unlinkAll looseJsOrJsxFiles
-  looseCssFiles = await glob '**/*.css{,.map}',
-    ignore: 'node_modules/**'
-  await unlinkAll looseCssFiles
+  looseJsOrJsxFiles = glob '**/*.{m,}js{,x}{,.map}', ignore: 'node_modules/**'
+  looseCssFiles = glob '**/*.css{,.map}', ignore: 'node_modules/**'
+  looseHtmlFiles = glob '**/*.html', ignore: 'index.html'
+
+  Promise.all [looseJsOrJsxFiles, looseCssFiles, looseHtmlFiles]
+    .then ([looseJsOrJsxFiles, looseCssFiles, looseHtmlFiles]) ->
+      unlinkAll [looseJsOrJsxFiles..., looseCssFiles..., looseHtmlFiles...]
 
 task 'bundle', 'create a single merged javascript bundle', ({output = 'bundle.js'}) ->
   await unlinkIgnoringError output
+
+  await invoke 'build'
 
   allCoffeeSources = await glob '**/*.{cjsx,coffee}',
     ignore: 'node_modules/**'

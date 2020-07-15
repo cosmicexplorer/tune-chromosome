@@ -53,7 +53,7 @@
         @value = @range.normalize newInput
         null
 
-Then we define a `DigitalInput`.
+Then we define a `DigitalValue`.
 
     class DigitalValue
       ###::
