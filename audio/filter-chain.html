@@ -1,18 +1,17 @@
 <p>@flow</p>
-<pre><code>stringHash = require &#39;string-hash&#39;
+<pre><code>assert = require &#39;assert&#39;
+
+stringHash = require &#39;string-hash&#39;
 
 ###::
   import type {TypedKey} from &#39;../util/collections&#39;;
+###
+{InputMapping, InputControlsSpecification, ContinuousInputSpec, DigitalInputSpec} = require &#39;../input/input&#39;
+###::
+  import type {InputSpec} from &#39;../input/input&#39;;
 ###</code></pre>
 <h1 id="filtername">FilterName</h1>
-<pre><code>class FilterName ###:: implements TypedKey###
-  ###::
-    name: string
-  ###
-  constructor: (name###: string###) -&gt;
-    @name = name
-
-  computeHash: -&gt; stringHash @name</code></pre>
+<pre><code>class FilterName extends StringKey</code></pre>
 <h1 id="filter">Filter</h1>
 <p><code>Filter</code>s have controls and convert an input stream to an output stream!</p>
 <p><strong>Filters represent &quot;the state of making and iterating on a sound&quot; as atomically as possible.</strong> By selecting a filter, the user should be able to:</p>
@@ -108,4 +107,13 @@ class FilterNode
     throw new Error(&quot;TODO: unimplemented!!!&quot;)</code></pre>
 <h2 id="filterparameter">FilterParameter</h2>
 <p>This class points somewhere into some nested <a href="#filter-node"><code>FilterNode</code></a> and into a setting on its contained <a href="#filter"><code>Filter</code></a>. Note that a Filter will have its own InputMapping as well. <strong>RECURSION!</strong></p>
-<pre><code>class FilterParameter</code></pre>
+<pre><code>class FilterParameter
+  ###::
+    spec: InputSpec&lt; any &gt;
+  ###
+  constructor: (spec###: InputSpec&lt; any &gt;###) -&gt;
+    @spec = spec</code></pre>
+<h1 id="exports">Exports</h1>
+<pre><code>module.exports = {
+  Filter, FilterNode, FilterParameter,
+}</code></pre>

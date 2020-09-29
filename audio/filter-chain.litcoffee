@@ -1,21 +1,20 @@
 @flow
 
+    assert = require 'assert'
+
     stringHash = require 'string-hash'
 
     ###::
       import type {TypedKey} from '../util/collections';
     ###
+    {InputMapping, InputControlsSpecification, ContinuousInputSpec, DigitalInputSpec} = require '../input/input'
+    ###::
+      import type {InputSpec} from '../input/input';
+    ###
 
 # FilterName
 
-    class FilterName ###:: implements TypedKey###
-      ###::
-        name: string
-      ###
-      constructor: (name###: string###) ->
-        @name = name
-
-      computeHash: -> stringHash @name
+    class FilterName extends StringKey
 
 # Filter
 `Filter`s have controls and convert an input stream to an output stream!
@@ -26,7 +25,6 @@
 
 Contrast to [`AppState`](../state-machine/operations.html#appstate)!
 
-
     class Filter
       ###::
         inputMapping: InputMapping
@@ -34,13 +32,10 @@ Contrast to [`AppState`](../state-machine/operations.html#appstate)!
       # $FlowFixMe
       constructor: (@inputMapping) ->
 
-
 # FilterNode
 A `FilterNode` is a wrapper for a node in a vast searchable graph of all `Filter`s! This means it contains the information required to effectively index and search filters later, in the finely-tuned `filter-select` view. It will also need to contain sufficient information to allow for `select-filter-parameter` to traverse nodes efficiently.
 
-
 **Filters are a "sound state", and FilterNodes are an index into a field (TODO: a math field????) to traverse sound states!!!!**
-
 
     _filterNodeSeparator = '/'
 
@@ -92,7 +87,6 @@ The `FilterNode` class follows:
         @output = output
         @timestamp = timestamp
 
-
 Retrieve the `source` and `output` nodes after asserting that they exist (i.e. that this FilterNode is "active" and has a specified input and output stream).
 
       assertPipedSourceOutput: ###: _pipedSourceOutput### ->
@@ -125,8 +119,18 @@ Immediately after selecting a filter, we expect the node we receive to have been
       remap: (inputMapping###: InputMapping###)###: FilterNode### ->
         throw new Error("TODO: unimplemented!!!")
 
-
 ## FilterParameter
 This class points somewhere into some nested [`FilterNode`](#filter-node) and into a setting on its contained [`Filter`](#filter). Note that a Filter will have its own InputMapping as well. **RECURSION!**
 
     class FilterParameter
+      ###::
+        spec: InputSpec< any >
+      ###
+      constructor: (spec###: InputSpec< any >###) ->
+        @spec = spec
+
+# Exports
+
+    module.exports = {
+      Filter, FilterNode, FilterParameter,
+    }

@@ -1,54 +1,87 @@
 # @flow
 
+assert = require 'assert'
+util = require 'util'
+
+stringHash = require 'string-hash'
+
+{Map} = require 'immutable'
 ###::
-  export interface TypedKey {
-    computeHash(): number;
-  }
+  import type {ValueObject} from 'immutable'
 ###
 
-class TypedMap ###::< K: TypedKey, V >###
+# TODO: This type does *not* include symbols, because they currently can't be unambiguously
+# converted to strings in a way that preserves the uniqueness of each `Symbol()` invocation!!
+###::
+  export type PrimitiveProductElement = boolean | string | number
+
+  export type ProductElement = TypedKey | PrimitiveProductElement
+
+  export type ProductElementSpecification = {[string]: ProductElement}
+
+  export interface TypedKey {
+    productElements(): ProductElementSpecification;
+  }
+
+  type ImmutableProductElementMapping = Map< string, (PrimitiveProductElement | ImmutableProductElementMapping) >
+###
+
+
+maybePrimitive = (x###: PrimitiveProductElement | any###)###: ?PrimitiveProductElement### ->
+  switch typeof x
+    when 'string', 'number', 'boolean' then x
+    else null
+
+
+class ProductKey ###::< K: TypedKey > implements ValueObject###
   ###::
-    tupleMap: Map< number, [K, V] >
+    key: K
+    productElements: ImmutableProductElementMapping
   ###
-  constructor: ->
-    @tupleMap = new Map
+  constructor: (key###: K###) ->
+    @key = key
+    @mapping = ProductKey._extractRecursiveProducts key.productElements()
 
-  clear: -> @tupleMap.clear()
+  _keyType: ()###: Class<K>### -> @key.constructor
 
-  size: ()###: number### -> @tupleMap.size
+  @_extractRecursiveProducts: (spec###: ProductElementSpecification###)###: ImmutableProductElementMapping### =>
+    replacedMapping = for name, value of spec
+      replacedValue###: PrimitiveProductElement | ImmutableProductElementMapping### =
+        # Don't replace primitive values.
+        maybePrimitive(value) ?
+        # Recursively extract an immutable mapping if it implements TypedKey, otherwise error!
+        @_extractRecursiveProducts (value.productElements?() ? (throw new UnhashableObject (new UnhashableElement value), spec))
+      [name, replacedValue]
+    new Map replacedMapping
 
-  delete: (key###: K###) ->
-    @tupleMap.delete key.computeHash()
+  equals: (other###: any###)###: boolean### ->
+    # Assert that the `key` object we were originally provided is the same `class` as the one in
+    # `other`, and then compare the immutable maps.
+    ((@_keyType() is other._keyType()) and (@mapping.equals other.mapping))
 
-  has: (key###: K###)###: boolean### ->
-    @tupleMap.has key.computeHash()
+  hashCode: ()###: number### -> @mapping.hashCode()
 
-  get: (key###: K###)###: ?V### ->
-    existing = @tupleMap.get key.computeHash()
-    if existing isnt undefined
-      [_, value] = existing
-      value
-    else
-      undefined
-
-  getNow: (key###: K###)###: V### ->
-    ret = @get key
-    throw new Error("no value found for key #{key.toString()}") if ret is undefined
-    # $FlowFixMe
-    ret
-
-  set: (key###: K###, value###: V###)###: TypedMap< K, V >### ->
-    @tupleMap.set key.computeHash(), [key, value]
-    @
-
-  entries: -> @tupleMap.values()
-
-  @fromPairs###::< K: TypedKey, V >###: (pairs###: Array< [K, V] >###)###: TypedMap< K, V >### =>
-    map###: TypedMap< K, V >### = new @
-    for [k, v] in pairs
-      map.set k, v
-    map
+  toString: -> "Key for #{@_keyType().name}(#{@mapping})"
 
 
+class UnhashableElement extends Error
+  ###::
+    obj: any
+  ###
+  constructor: (obj###: any###) ->
+    super "object #{util.inspect obj} was not hashable (does not implement TypedKey and is not a PrimitiveProductElement)!"
+    @obj = obj
 
-module.exports = {TypedMap}
+
+class UnhashableObject extends Error
+  ###::
+    childElement: any
+    parentObject: any
+  ###
+  constructor: (elementError###: UnhashableElement###, parentObject###: any###) ->
+    super "product object #{util.inspect parentObject} was not hashable due to an unhashable field: #{elementError}"
+    @childElement = elementError.obj
+    @parentObject = parentObject
+
+
+module.exports = {ProductKey, UnhashableObject}

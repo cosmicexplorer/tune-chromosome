@@ -1,0 +1,268 @@
+<p>@flow</p>
+<pre><code>assert = require &#39;assert&#39;
+{PassThrough} = require &#39;stream&#39;
+
+stringHash = require &#39;string-hash&#39;
+{Map} = require &#39;immutable&#39;
+
+{ProductKey, StringKey} = require &#39;../util/collections&#39;
+###::
+  import type {TypedKey, ProductElement, ProductElementSpecification} from &#39;../util/collections&#39;
+###</code></pre>
+<h1 id="statesource">StateSource</h1>
+<pre><code>###::
+  interface StateSource&lt;Input, Value&gt; {
+    sample(): Value;
+    update(input: Input): void;
+  }
+###
+
+class NormalizedFloat
+  ###::
+    inner: number
+  ###
+  constructor: (@inner) -&gt;
+    assert.ok @inner &gt;= 0
+    assert.ok @inner &lt;= 1
+
+  extractNormalizedFloat: -&gt; @inner
+
+  @Zero: =&gt; new @ 0
+  @One: =&gt; new @ 1
+
+class FloatRange
+  ###::
+    minimum: number
+    maximum: number
+    diff: number
+  ###
+  constructor: (@minimum, @maximum) -&gt;
+    assert.ok @maximum &gt; @minimum
+    @diff = @maximum - @minimum
+
+  normalize: (input###: number###)###: NormalizedFloat### -&gt;
+    assert.ok input &gt;= @minimum
+    assert.ok input &lt;= @maximum
+    inner = (input - @minimum) / @diff
+    new NormalizedFloat inner
+
+class ContinuousInput ###::implements StateSource&lt; number, NormalizedFloat &gt;###
+  ###::
+    range: FloatRange
+    value: NormalizedFloat
+  ###
+  constructor: (@range, @value = NormalizedFloat.Zero()) -&gt;
+
+  sample: ()###: NormalizedFloat### -&gt; @value
+
+  update: (newInput###: number###) -&gt;
+    @value = @range.normalize newInput
+    undefined</code></pre>
+<p>Then we define a <code>DigitalValue</code> as a union of literal types.</p>
+<pre><code>###::
+  export type DigitalValue = &#39;keycode-down&#39; | &#39;keycode-up&#39;
+###
+
+# TODO: implement this! Note that it will have to assert or ensure that only one of the digital
+# inputs will ever be on at a time!
+# class DigitalToAnalogSpreader ###::implements StateSource&lt; NormalizedFloat &gt;###
+#   ###::
+#     range: FloatRange
+#     orderedInputs: Array&lt; DigitalInput &gt;
+#   ###
+#   constructor: (@range, @orderedInputs) -&gt;
+#     assert.ok @orderedInputs.length &gt; 0</code></pre>
+<h1 id="inputmapping">InputMapping</h1>
+<pre><code>class InputMapping
+  ###::
+    mapping: Map&lt; ProductKey&lt; FilterName &gt;, InputAxisNode &gt;
+  ###
+  constructor: (mapping###: ?Map&lt; ProductKey&lt; FilterName &gt;, InputAxisNode &gt;### = new Map) -&gt;
+    @mapping = mapping</code></pre>
+<h1 id="inputcontrolsspecification">InputControlsSpecification</h1>
+<p>Separate from <a href="#inputmapping"><code>InputMapping</code></a> -- this describes the <em>View's</em> intrinsic input <em>requirements</em>, while <code>InputMapping</code> describes how the real analog/digital inputs match up to the declared inputs for each <code>View</code>!</p>
+<pre><code>class InputSpecId extends StringKey
+
+###::
+  export interface InputSpec&lt; T &gt; {
+    specId: InputSpecId;
+    defaultValue: ?T;
+  }
+###
+
+class ContinuousInputSpec ###:: implements InputSpec&lt; NormalizedFloat &gt;###
+  ###::
+    specId: InputSpecId
+    defaultValue: ?NormalizedFloat
+  ###
+  constructor: (specId###: InputSpecId###, defaultValue###: ?NormalizedFloat### = null) -&gt;
+    @specId = specId
+    @defaultValue = defaultValue
+
+class DigitalInputSpec ###:: implements InputSpec&lt; DigitalValue &gt;###
+  ###::
+    specId: InputSpecId
+    defaultValue: ?DigitalValue
+  ###
+  constructor: (specId###: InputSpecId###, defaultValue###: ?DigitalValue###) -&gt;
+    @specId = specId
+    @defaultValue = defaultValue
+
+class InputControlsSpecification
+  ###::
+    specs: Array&lt; InputSpec&lt; any &gt; &gt;
+  ###
+  constructor: (specs###: Array&lt; InputSpec&lt; any &gt; &gt;###) -&gt;
+    @specs = specs
+
+  @Empty: =&gt; new @ []</code></pre>
+<h1 id="inputregistry">InputRegistry</h1>
+<pre><code>class UnmappedKeypressError extends Error
+  ###::
+    unmappedKey: DiscreteInputEvent
+  ###
+  constructor: (unmappedKey###: DiscreteInputEvent###) -&gt;
+    super &quot;key #{unmappedKey} was not mapped!&quot;
+    @unmappedKey = unmappedKey
+
+class Kbd
+  ###::
+    keys: string
+  ###
+  constructor: (@keys) -&gt;
+    assert.ok keys.length is 1
+
+###::
+  type InputRegistryEntry = InputRegistry | InputEventsStream
+
+  type _mapping&lt; K: TypedKey, V&gt; = Map&lt; ProductKey &lt; K &gt;, V &gt;
+###
+
+class InputRegistry
+  ###::
+    mapping: _mapping&lt;DiscreteInputEvent, InputRegistryEntry&gt;
+  ###
+  constructor: (previous###: InputRegistry | any###) -&gt;
+    @mapping = if previous?.constructor is InputRegistry then previous.mapping else previous
+
+  merge: (other###: InputRegistry###)###: InputRegistry### -&gt;
+    new InputRegistry (@mapping.merge other.mapping)
+
+  acceptKeyEvent: (keyCode###: DiscreteInputEvent###)###: ?InputRegistry### -&gt;
+    entry = @mapping.get(new ProductKey keyCode) ? throw new UnmappedKeypressError keyCode
+    switch entry.constructor
+      when InputRegistry then entry
+      when InputEventsStream
+        entry.write keyCode
+        null
+      else throw entry
+
+  # registerKeystroke: (kbd###: Kbd###, dispatch###: (RegistryOperation) =&gt; void###)###: InputEventsStream### -&gt;
+  #   [keyDown, keyUp] = DiscreteInputEvent.keypressPairFromKbd kbd
+  #   downKey = new ProductKey keyDown
+  #   upKey = new ProductKey keyUp
+
+  #   downRegistry = if @mapping.has downKey
+  #     maybeRegistry = @mapping.get downKey
+  #     assert.ok maybeRegistry::constructor is InputRegistry
+  #     maybeRegistry
+  #   else
+  #     newDownRegistry = new InputRegistry
+  #     dispatch new UpdateRegistryBindings new InputRegistry new Map [[downKey, newDownRegistry]]
+  #     newDownRegistry
+
+  #   upStream = if downRegistry.has upKey
+  #     maybeStream = downRegistry.get upKey
+  #     assert.ok maybeStream::constructor is InputEventsStream
+  #     maybeStream
+  #   else
+  #     newUpStream = new InputEventsStream
+  #     (downRegistry.set upKey, new InputEventsStream).get upKey
+
+  #   upStream</code></pre>
+<h2 id="registryoperation">RegistryOperation</h2>
+<pre><code>###::
+  export interface RegistryOperation {
+    invoke(registries: RegistryForInputRegistries): RegistryForInputRegistries;
+  }
+###
+
+class Keypress ###:: implements RegistryOperation###
+  ###::
+    event: DiscreteInputEvent
+  ###
+  constructor: (event###: DiscreteInputEvent###) -&gt; @event = event
+
+  invoke: (registry###: InputRegistry###)###: InputRegistry### -&gt;
+    registry.acceptKeyEvent(@event) ? new InputRegistry
+
+class UpdateRegistryBindings ###:: implements RegistryOperation###
+  ###::
+    source: Symbol
+    newRegistry: InputRegistry
+  ###
+  constructor: (source###: Symbol###, newRegistry###: InputRegistry###) -&gt;
+    @source = source
+    @newRegistry = newRegistry
+
+  invoke: (registry###: InputRegistry###)###: InputRegistry### -&gt;
+    registry.merge @newRegistry</code></pre>
+<h2 id="discreteinputevent">DiscreteInputEvent</h2>
+<pre><code>###::
+  type _inputEventOpts = {|
+    key: string,
+    keyValue?: ?DigitalValue,
+    ctrlPressed?: ?boolean,
+    metaPressed?: ?boolean,
+    shiftPressed?: ?boolean,
+  |}
+###
+
+class DiscreteInputEvent ###:: implements TypedKey###
+  ###::
+    key: string
+    keyValue: DigitalValue
+    ctrlPressed: boolean
+    metaPressed: boolean
+    shiftPressed: boolean
+  ###
+  constructor: (opts###: _inputEventOpts###) -&gt;
+    {key, keyValue = DigitalValue.Down(), ctrlPressed = no, metaPressed = no, shiftPressed = no} = opts
+    @key = key
+    @keyValue = keyValue
+    @ctrlPressed = ctrlPressed
+    @metaPressed = metaPressed
+    @shiftPressed = shiftPressed
+
+  productElements: ()###: ProductElementSpecification### -&gt; @
+
+  @keypressPairFromKbd: (kbd###: Kbd###)###: [DiscreteInputEvent, DiscreteInputEvent]### =&gt;
+    keyDown = new @ {key: kbd.keys, keyValue: DigitalValue.Down()}
+    keyUp = new @ {key: kbd.keys, keyValue: DigitalValue.Up()}
+    [keyDown, keyUp]
+
+  @fromKeyboardEvent: (event###: KeyboardEvent###, keyValue###: DigitalValue###)###: DiscreteInputEvent### =&gt;
+    {key, ctrlKey: ctrlPressed, metaKey: metaPressed, shiftKey: shiftPressed} = event
+    new @ key, ctrlPressed, metaPressed, shiftPressed, keyValue</code></pre>
+<h2 id="inputeventsstream">InputEventsStream</h2>
+<pre><code>class InputEventsStream extends PassThrough
+  ###::
+    exclusiveListener: ?(DiscreteInputEvent) =&gt; void
+  ###
+  constructor: -&gt;
+    super objectMode: yes
+    @exclusiveListener = null
+
+  subscribeExclusive: (fn###: (DiscreteInputEvent) =&gt; void###) -&gt;
+    @unsubscribeRemaining()
+    @exclusiveListener = fn
+    @addListener &#39;data&#39;, fn
+
+  unsubscribeRemaining: -&gt;
+    @removeListener &#39;data&#39;, @exclusiveListener if @exclusiveListener?</code></pre>
+<h1 id="exports">Exports</h1>
+<pre><code>module.exports = {
+  InputMapping, InputControlsSpecification, DigitalInput, DigitalValue,
+  InputRegistry, DiscreteInputEvent, InputEventsStream, Keypress, UpdateRegistryBindings,
+  ContinuousInputSpec, DigitalInputSpec,
+}</code></pre>
